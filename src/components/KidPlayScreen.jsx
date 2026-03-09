@@ -141,6 +141,9 @@ export default function KidPlayScreen({
         {interactionMode === 'feed' ? (
           <p className="kid-mode-hint">Drag the apple onto Buddy's mouth 3 times.</p>
         ) : null}
+        {interactionMode === 'play' ? (
+          <p className="kid-mode-hint">Drag the tickle tool over Buddy until the bar is full.</p>
+        ) : null}
         <div className="kid-actions-grid">
           <ActionButton
             icon="F"
@@ -158,9 +161,17 @@ export default function KidPlayScreen({
           />
           <ActionButton
             icon="P"
-            label="Play"
-            disabled={saving || !canEdit || Boolean(interactionMode)}
-            onClick={() => onKidAction('play')}
+            label={interactionMode === 'play' ? 'Tickle!' : 'Play'}
+            disabled={saving || !canEdit || interactionMode === 'clean' || interactionMode === 'feed'}
+            onClick={() => {
+              if (interactionMode === 'play') {
+                setInteractionMode('');
+                setInteractionProgress(0);
+                return;
+              }
+              setInteractionMode('play');
+              setInteractionProgress(0);
+            }}
           />
           <ActionButton
             icon="C"

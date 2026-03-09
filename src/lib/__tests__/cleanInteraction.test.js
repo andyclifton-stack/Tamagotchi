@@ -3,7 +3,9 @@ import {
   getCoverageCell,
   getCoverageProgress,
   getFeedDeliveryProgress,
-  isFeedTargetHit
+  getPlayTargetCell,
+  isFeedTargetHit,
+  isPlayTargetHit
 } from '../cleanInteraction';
 
 describe('clean interaction helpers', () => {
@@ -25,5 +27,11 @@ describe('clean interaction helpers', () => {
     expect(getFeedDeliveryProgress(0, 3)).toBe(0);
     expect(getFeedDeliveryProgress(2, 3)).toBeCloseTo(0.666, 2);
     expect(getFeedDeliveryProgress(8, 3)).toBe(1);
+  });
+
+  it('detects play target coverage cells', () => {
+    expect(isPlayTargetHit(0.5, 0.59)).toBe(true);
+    expect(isPlayTargetHit(0.92, 0.2)).toBe(false);
+    expect(getPlayTargetCell(0.5, 0.59)).toBe('3:3');
   });
 });

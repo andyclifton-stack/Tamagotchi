@@ -572,6 +572,41 @@
   line-height: 1;
 }
 
+.play-item-source {
+  position: absolute;
+  z-index: 6;
+  right: 16px;
+  bottom: 14px;
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(105, 67, 169, 0.24);
+  box-shadow: 0 10px 20px rgba(25, 43, 74, 0.2);
+  animation: feedSourceBob 1.4s ease-in-out infinite;
+}
+
+.play-item-source span {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.play-target-glow {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  top: 59%;
+  width: 165px;
+  height: 160px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 2px dashed rgba(157, 98, 227, 0.45);
+  background: radial-gradient(circle, rgba(193, 142, 255, 0.18), rgba(193, 142, 255, 0.03));
+  animation: feedPulse 900ms ease-in-out infinite;
+}
+
 .clean-tool {
   position: absolute;
   z-index: 6;

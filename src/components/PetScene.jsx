@@ -5,7 +5,9 @@ import {
   getCoverageCell,
   getCoverageProgress,
   getFeedDeliveryProgress,
-  isFeedTargetHit
+  getPlayTargetCell,
+  isFeedTargetHit,
+  isPlayTargetHit
 } from '../lib/cleanInteraction';
 
 function expressionForMood(mood) {
@@ -175,6 +177,7 @@ export default function PetScene({
   const status = pet.status || pet.statusPreview || {};
   const cleanMode = interactionMode === 'clean';
   const feedMode = interactionMode === 'feed';
+  const playMode = interactionMode === 'play';
   const scrubGoal = 0.72;
   const feedGoal = 1;
   const dustAlpha = Math.max(0, 1 - interactionProgress);
@@ -193,7 +196,7 @@ export default function PetScene({
   }, [theme.family, pet, species]);
 
   useEffect(() => {
-    if (!cleanMode && !feedMode) {
+    if (!cleanMode && !feedMode && !playMode) {
       pointerActiveRef.current = false;
       visitedCellsRef.current = new Set();
       feedDropCountRef.current = 0;
@@ -210,7 +213,7 @@ export default function PetScene({
     if (typeof onInteractionProgress === 'function') {
       onInteractionProgress(0);
     }
-  }, [cleanMode, feedMode, onInteractionProgress]);
+  }, [cleanMode, feedMode, playMode, onInteractionProgress]);
 
   const moodClass = useMemo(() => {
     if (status?.careCenterRest) return 'is-resting';
@@ -221,7 +224,7 @@ export default function PetScene({
   }, [stats.messCount, status]);
 
   const handleInteractionPoint = (clientX, clientY) => {
-    if ((!cleanMode && !feedMode) || !roomRef.current) return;
+    if ((!cleanMode && !feedMode && !playMode) || !roomRef.current) return;
     const rect = roomRef.current.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
 
@@ -267,13 +270,36 @@ export default function PetScene({
         }
       }
       feedWasInsideRef.current = insideTarget;
+      return;
+    }
+
+    if (playMode) {
+      if (!isPlayTargetHit(relX, relY)) return;
+      const key = getPlayTargetCell(relX, relY);
+      if (visitedCellsRef.current.has(key)) return;
+      visitedCellsRef.current.add(key);
+
+      const progress = getCoverageProgress(visitedCellsRef.current.size, 6, 6);
+      if (typeof onInteractionProgress === 'function') {
+        onInteractionProgress(progress);
+      }
+      if (progress >= 0.58 && !completeFiredRef.current) {
+        completeFiredRef.current = true;
+        if (typeof onInteractionComplete === 'function') {
+          onInteractionComplete('play');
+        }
+      }
     }
   };
 
   const handlePointerDown = (event) => {
-    if (!cleanMode && !feedMode) return;
+    if (!cleanMode && !feedMode && !playMode) return;
     if (feedMode) {
       const fromSource = Boolean(event.target.closest?.('.feed-item-source'));
+      if (!fromSource) return;
+    }
+    if (playMode) {
+      const fromSource = Boolean(event.target.closest?.('.play-item-source'));
       if (!fromSource) return;
     }
     pointerActiveRef.current = true;
@@ -282,7 +308,7 @@ export default function PetScene({
   };
 
   const handlePointerMove = (event) => {
-    if ((!cleanMode && !feedMode) || !pointerActiveRef.current) return;
+    if ((!cleanMode && !feedMode && !playMode) || !pointerActiveRef.current) return;
     handleInteractionPoint(event.clientX, event.clientY);
   };
 
@@ -296,7 +322,7 @@ export default function PetScene({
     <div className={`pet-scene ${theme.roomClass} ${moodClass}${compact ? ' is-compact' : ''}`}>
       <div
         ref={roomRef}
-        className={`pet-scene__room pet-scene__room--${pet.timeOfDay || 'day'}${cleanMode || feedMode ? ' is-clean-mode' : ''}`}
+        className={`pet-scene__room pet-scene__room--${pet.timeOfDay || 'day'}${cleanMode || feedMode || playMode ? ' is-clean-mode' : ''}`}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -317,11 +343,11 @@ export default function PetScene({
         {status?.isSick ? <div className="scene-badge scene-badge--ill">Sick</div> : null}
         {stats.messCount > 0 ? <div className="scene-badge scene-badge--mess">Mess x{stats.messCount}</div> : null}
         {status?.careCenterRest ? <div className="scene-overlay-copy">Care Center Rest</div> : null}
-        {cleanMode || feedMode ? (
+        {cleanMode || feedMode || playMode ? (
           <>
             <div className="clean-overlay">
               <div className="clean-overlay__head">
-                <span>{cleanMode ? 'Scrub to clean' : 'Drag food to mouth'}</span>
+                <span>{cleanMode ? 'Scrub to clean' : feedMode ? 'Drag food to mouth' : 'Tickle Buddy'}</span>
                 <strong>{Math.round(interactionProgress * 100)}%</strong>
               </div>
               <div className="clean-overlay__track">
@@ -345,10 +371,18 @@ export default function PetScene({
               ))
               : (
                 <>
-                  <div className="feed-target-ring" aria-hidden="true" />
-                  <div className="feed-item-source" aria-hidden="true">
-                    <span>🍎</span>
-                  </div>
+                  {feedMode ? <div className="feed-target-ring" aria-hidden="true" /> : null}
+                  {playMode ? <div className="play-target-glow" aria-hidden="true" /> : null}
+                  {feedMode ? (
+                    <div className="feed-item-source" aria-hidden="true">
+                      <span>🍎</span>
+                    </div>
+                  ) : null}
+                  {playMode ? (
+                    <div className="play-item-source" aria-hidden="true">
+                      <span>🪶</span>
+                    </div>
+                  ) : null}
                 </>
               )}
             <div
@@ -359,7 +393,7 @@ export default function PetScene({
               }}
               aria-hidden="true"
             >
-              {cleanMode ? 'S' : '🍎'}
+              {cleanMode ? 'S' : feedMode ? '🍎' : '🪶'}
             </div>
           </>
         ) : null}
