@@ -53,9 +53,12 @@ function OwnerApp() {
   const [hasParentPin, setHasParentPin] = useState(false);
   const [petPinPromptOpen, setPetPinPromptOpen] = useState(false);
   const [petPinError, setPetPinError] = useState('');
+  const [starterRetryTick, setStarterRetryTick] = useState(0);
 
   const noticeTimerRef = useRef(0);
-  const starterCreatedRef = useRef(false);
+  const starterDoneRef = useRef(false);
+  const starterCreatingRef = useRef(false);
+  const starterRetryCountRef = useRef(0);
   const lastReactionRef = useRef('');
   const lastEventKeyRef = useRef('');
 
@@ -84,27 +87,51 @@ function OwnerApp() {
   }, [petList.pets, selectedPetId]);
 
   useEffect(() => {
+    if (petList.pets.length) {
+      starterDoneRef.current = true;
+      starterCreatingRef.current = false;
+      starterRetryCountRef.current = 0;
+    }
+  }, [petList.pets.length]);
+
+  useEffect(() => {
     const shouldCreate = shouldAutoCreateStarter({
       booting: boot.booting,
       ownerUid: boot.user?.uid,
       petListLoading: petList.loading,
       petCount: petList.pets.length,
-      starterCreated: starterCreatedRef.current
+      starterCreated: starterDoneRef.current || starterCreatingRef.current
     });
     if (!shouldCreate) return;
 
-    starterCreatedRef.current = true;
+    starterCreatingRef.current = true;
     session
       .createPetSession(buildStarterPetInput())
       .then((pet) => {
+        starterCreatingRef.current = false;
+        starterDoneRef.current = true;
+        starterRetryCountRef.current = 0;
         setSelectedPetId(pet.id);
         setLastPetId(pet.id);
         setNotice('Your buddy is ready!');
       })
       .catch((error) => {
+        starterCreatingRef.current = false;
+        starterRetryCountRef.current += 1;
         setNotice(error.message || 'Could not create starter pet.');
+        if (starterRetryCountRef.current < 4) {
+          window.setTimeout(() => {
+            setStarterRetryTick((tick) => tick + 1);
+          }, 1500);
+        }
       });
-  }, [boot.booting, boot.user?.uid, petList.loading, petList.pets.length]);
+  }, [
+    boot.booting,
+    boot.user?.uid,
+    petList.loading,
+    petList.pets.length,
+    starterRetryTick
+  ]);
 
   useEffect(() => {
     if (session.error) {
