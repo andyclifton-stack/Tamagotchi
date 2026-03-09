@@ -4,14 +4,12 @@ Mobile-first virtual pet game built with React, Vite, Firebase Realtime Database
 
 ## Features
 
-- Create, save, and load multiple pets for the current browser profile
-- Real-time progression while the app is closed
-- Egg to adult growth with care-based adult branch selection
-- Three themes: Modern Soft 3D, Retro Pixel-Art Polished, Cute Playful
-- Optional per-pet PIN plus master parent PIN `999`
-- Parent tools for rescue, stat fixes, rename, delete, and force-stage testing
-- Public read-only pet sharing with WhatsApp support
-- Firebase-backed persistence with isolated namespace `tamagotchi/v1`
+- One-tap child flow for ages 5-8 with four visible needs: Hunger, Happy, Energy, Clean
+- Automatic starter pet creation for first-time owners (`Buddy`)
+- Hidden parent gate (long-press app title) with custom 4-digit parent PIN
+- Parent-only controls for pet management, rescue actions, settings, and sharing
+- Public read-only pet sharing with simplified view and WhatsApp support
+- Existing Firebase saves remain compatible under `tamagotchi/v1`
 
 ## Local development
 

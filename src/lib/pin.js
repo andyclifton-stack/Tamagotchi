@@ -35,9 +35,6 @@ export async function hashPin(pin, salt) {
 }
 
 export async function verifyPin(pin, hash, salt) {
-  if (isMasterPin(pin)) {
-    return true;
-  }
   if (!hash || !salt) {
     return false;
   }

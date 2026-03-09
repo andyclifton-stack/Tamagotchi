@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import Button from './ui/Button';
 
 export default function AppShell({
@@ -6,9 +7,30 @@ export default function AppShell({
   notice,
   onBack,
   onHome,
+  onTitleHold,
   actions,
   children
 }) {
+  const holdTimerRef = useRef(0);
+
+  const clearHold = () => {
+    if (holdTimerRef.current) {
+      window.clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = 0;
+    }
+  };
+
+  const startHold = () => {
+    if (!onTitleHold) return;
+    clearHold();
+    holdTimerRef.current = window.setTimeout(() => {
+      holdTimerRef.current = 0;
+      onTitleHold();
+    }, 2000);
+  };
+
+  useEffect(() => () => clearHold(), []);
+
   return (
     <div className="app-shell">
       <header className="app-shell__header">
@@ -24,7 +46,13 @@ export default function AppShell({
             </Button>
           ) : null}
         </div>
-        <div className="app-shell__title-wrap">
+        <div
+          className="app-shell__title-wrap"
+          onPointerDown={startHold}
+          onPointerUp={clearHold}
+          onPointerLeave={clearHold}
+          onPointerCancel={clearHold}
+        >
           <p className="eyebrow">{subtitle}</p>
           <h1>{title}</h1>
         </div>

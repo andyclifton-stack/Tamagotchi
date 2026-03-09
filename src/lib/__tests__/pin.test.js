@@ -10,11 +10,8 @@ describe('pin helpers', () => {
     expect(await verifyPin('9876', hashed, salt)).toBe(false);
   });
 
-  it('accepts the master pin shortcut', async () => {
-    const salt = createSalt();
-    const hashed = await hashPin('1234', salt);
-
+  it('keeps master pin detection separate from hashed verification', async () => {
     expect(isMasterPin('999')).toBe(true);
-    expect(await verifyPin('999', hashed, salt)).toBe(true);
+    expect(await verifyPin('999', '', '')).toBe(false);
   });
 });

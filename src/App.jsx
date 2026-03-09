@@ -1,18 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import AppShell from './components/AppShell';
-import HomeScreen from './components/HomeScreen';
-import CreatePetScreen from './components/CreatePetScreen';
-import LoadPetsScreen from './components/LoadPetsScreen';
-import SettingsScreen from './components/SettingsScreen';
-import HelpScreen from './components/HelpScreen';
-import PetScreen from './components/PetScreen';
+import KidPlayScreen from './components/KidPlayScreen';
+import ParentGateModal from './components/ParentGateModal';
+import ParentPanel from './components/ParentPanel';
 import PublicPetView from './components/PublicPetView';
 import Card from './components/ui/Card';
-import Button from './components/ui/Button';
+import PinPrompt from './components/PinPrompt';
 import { useAppBoot } from './hooks/useAppBoot';
 import { usePetList } from './hooks/usePetList';
 import { usePetSession } from './hooks/usePetSession';
-import { getLastPetId } from './lib/storage';
+import { getLastPetId, setLastPetId } from './lib/storage';
+import {
+  getParentAccess,
+  lockParentGate,
+  setupParentPin,
+  unlockParentGate
+} from './lib/parentGate';
+import {
+  deriveKidNeeds,
+  mapKidActionToEngineActions,
+  shouldShowMedicine
+} from './lib/kidPlay';
+import { buildStarterPetInput, shouldAutoCreateStarter } from './lib/starterPet';
 import { buildAppShareUrl, openWhatsAppShare, shareUrl } from './lib/share';
 import { playSound, unlockAudio } from './lib/audio';
 
@@ -37,26 +46,65 @@ export default function App() {
 function OwnerApp() {
   const boot = useAppBoot(true);
   const petList = usePetList(boot.user?.uid);
-  const [screen, setScreen] = useState('home');
   const [selectedPetId, setSelectedPetId] = useState('');
   const [notice, setNotice] = useState('');
+  const [parentGateOpen, setParentGateOpen] = useState(false);
+  const [parentPanelOpen, setParentPanelOpen] = useState(false);
+  const [hasParentPin, setHasParentPin] = useState(false);
+  const [petPinPromptOpen, setPetPinPromptOpen] = useState(false);
+  const [petPinError, setPetPinError] = useState('');
+
+  const noticeTimerRef = useRef(0);
+  const starterCreatedRef = useRef(false);
   const lastReactionRef = useRef('');
   const lastEventKeyRef = useRef('');
-  const noticeTimerRef = useRef(0);
 
   const session = usePetSession({
     petId: selectedPetId,
     ownerUid: boot.user?.uid || ''
   });
 
+  const activePet =
+    petList.pets.find((pet) => pet.id === selectedPetId) || petList.pets[0] || null;
+
   useEffect(() => {
     if (!selectedPetId && petList.pets.length) {
       const restored = petList.pets.find((pet) => pet.id === getLastPetId());
-      if (restored) {
-        setSelectedPetId(restored.id);
+      setSelectedPetId(restored ? restored.id : petList.pets[0].id);
+    }
+  }, [petList.pets, selectedPetId]);
+
+  useEffect(() => {
+    if (selectedPetId && petList.pets.length) {
+      const exists = petList.pets.some((pet) => pet.id === selectedPetId);
+      if (!exists) {
+        setSelectedPetId(petList.pets[0].id);
       }
     }
   }, [petList.pets, selectedPetId]);
+
+  useEffect(() => {
+    const shouldCreate = shouldAutoCreateStarter({
+      booting: boot.booting,
+      ownerUid: boot.user?.uid,
+      petListLoading: petList.loading,
+      petCount: petList.pets.length,
+      starterCreated: starterCreatedRef.current
+    });
+    if (!shouldCreate) return;
+
+    starterCreatedRef.current = true;
+    session
+      .createPetSession(buildStarterPetInput())
+      .then((pet) => {
+        setSelectedPetId(pet.id);
+        setLastPetId(pet.id);
+        setNotice('Your buddy is ready!');
+      })
+      .catch((error) => {
+        setNotice(error.message || 'Could not create starter pet.');
+      });
+  }, [boot.booting, boot.user?.uid, petList.loading, petList.pets.length]);
 
   useEffect(() => {
     if (session.error) {
@@ -68,8 +116,8 @@ function OwnerApp() {
     if (!boot.settings.soundEnabled) return;
     if (!session.lastReaction || session.lastReaction === lastReactionRef.current) return;
     lastReactionRef.current = session.lastReaction;
-    playSound(session.lastReaction, boot.settings.soundEnabled);
-  }, [session.lastReaction, boot.settings.soundEnabled]);
+    playSound(session.lastReaction, true);
+  }, [boot.settings.soundEnabled, session.lastReaction]);
 
   useEffect(() => {
     if (!boot.settings.soundEnabled || !session.lastEvents.length) return;
@@ -80,7 +128,7 @@ function OwnerApp() {
     if (latest.type === 'hatch') playSound('hatch', true);
     if (latest.type === 'evolution') playSound('evolve', true);
     if (latest.type === 'illness' || latest.type === 'care-center') playSound('sad', true);
-  }, [session.lastEvents, boot.settings.soundEnabled]);
+  }, [boot.settings.soundEnabled, session.lastEvents]);
 
   useEffect(() => {
     return () => {
@@ -88,98 +136,135 @@ function OwnerApp() {
     };
   }, []);
 
-  const featuredPet =
-    petList.pets.find((pet) => pet.id === selectedPetId) ||
-    petList.pets[0] ||
-    null;
-
-  const canEdit = session.pet ? !session.pet.pinEnabled || session.unlockState.careUnlocked : false;
-  const canAdmin = session.unlockState.adminUnlocked;
-
   const showNotice = (message) => {
     setNotice(message);
     window.clearTimeout(noticeTimerRef.current);
     noticeTimerRef.current = window.setTimeout(() => setNotice(''), 3200);
   };
 
-  const handleCreate = async (input) => {
+  const canEdit = session.pet
+    ? !session.pet.pinEnabled || session.unlockState.careUnlocked
+    : false;
+  const kidNeeds = deriveKidNeeds(session.pet);
+
+  const handleKidAction = async (actionId) => {
+    const actions = mapKidActionToEngineActions(actionId, session.pet);
+    if (!actions.length) return;
     try {
-      const newPet = await session.createPetSession(input);
-      setSelectedPetId(newPet.id);
-      setScreen('pet');
-      showNotice(`${newPet.name} is ready to hatch.`);
+      for (const action of actions) {
+        await session.performAction(action);
+      }
     } catch (error) {
-      showNotice(error.message || 'Could not create that pet.');
+      showNotice(error.message || 'That action did not save.');
     }
   };
 
-  const handleSelectPet = (petId) => {
-    setSelectedPetId(petId);
-    setScreen('pet');
-  };
-
-  const handleShareApp = async () => {
-    const url = buildAppShareUrl();
+  const handleAppShare = async () => {
     const result = await shareUrl({
       title: 'Tamagotchi',
-      text: 'Care for a real-time virtual pet in Tamagotchi.',
-      url
+      text: 'Play Tamagotchi with us!',
+      url: buildAppShareUrl()
     });
-    showNotice(result.method === 'clipboard' ? 'App link copied.' : 'App share opened.');
+    showNotice(result.method === 'clipboard' ? 'App link copied.' : 'Share opened.');
   };
 
-  const handleSharePet = async (mode = 'native') => {
+  const handlePetShare = async (mode = 'native') => {
     if (!session.pet) return;
     try {
       const share = await session.sharePet();
       if (!share) return;
       if (mode === 'whatsapp') {
-        openWhatsAppShare(`Check in on ${session.pet.name} in Tamagotchi.`, share.shareUrl);
-        showNotice('Opening WhatsApp share.');
+        openWhatsAppShare(`Check in on ${session.pet.name}!`, share.shareUrl);
+        showNotice('Opening WhatsApp.');
         return;
       }
       const result = await shareUrl({
         title: `${session.pet.name} on Tamagotchi`,
-        text: `Check in on ${session.pet.name}'s live pet view.`,
+        text: `Check in on ${session.pet.name}.`,
         url: share.shareUrl
       });
-      showNotice(result.method === 'clipboard' ? 'Pet link copied.' : 'Pet share opened.');
+      showNotice(result.method === 'clipboard' ? 'Pet link copied.' : 'Share opened.');
     } catch (error) {
-      showNotice(error.message || 'Could not share that pet.');
+      showNotice(error.message || 'Could not share pet.');
     }
   };
 
-  const handleThemeChange = async (themeId) => {
+  const openParentAccess = () => {
+    const access = getParentAccess();
+    if (access.gate.unlocked && access.hasPin) {
+      setParentPanelOpen(true);
+      return;
+    }
+    setHasParentPin(access.hasPin);
+    setParentGateOpen(true);
+  };
+
+  const handleParentSetup = async (pin, confirmPin) => {
+    const result = await setupParentPin(pin, confirmPin);
+    if (result.ok) {
+      setHasParentPin(true);
+      setParentPanelOpen(true);
+    }
+    return result;
+  };
+
+  const handleParentUnlock = async (pin) => {
+    const result = await unlockParentGate(pin);
+    if (result.ok) {
+      setParentPanelOpen(true);
+    }
+    return result;
+  };
+
+  const handleRenamePet = async (name) => {
+    if (!session.pet) return;
     try {
-      await session.savePetEdit((draft) => {
-        draft.theme = themeId;
-      }, 'Theme updated.');
-      showNotice('Theme updated.');
+      await session.performAction({ type: 'admin', payload: { kind: 'rename', name } });
+      showNotice('Name updated.');
     } catch (error) {
-      showNotice(error.message || 'Could not change the theme.');
+      showNotice(error.message || 'Could not rename pet.');
     }
   };
 
   const handleDeletePet = async () => {
     if (!session.pet) return;
-    const confirmed = window.confirm(`Delete ${session.pet.name}? This removes the pet and its share view.`);
+    const confirmed = window.confirm(`Delete ${session.pet.name}?`);
     if (!confirmed) return;
     try {
       await session.removePet();
       setSelectedPetId('');
-      setScreen('home');
       showNotice('Pet deleted.');
     } catch (error) {
-      showNotice(error.message || 'Could not delete that pet.');
+      showNotice(error.message || 'Could not delete pet.');
     }
   };
 
-  const renderScreen = () => {
+  const handleAdminAction = async (kind) => {
+    if (!session.pet) return;
+    try {
+      await session.performAction({ type: 'admin', payload: { kind } });
+      showNotice('Parent action saved.');
+    } catch (error) {
+      showNotice(error.message || 'Could not apply parent action.');
+    }
+  };
+
+  const handleUnlockPet = async (pin) => {
+    const result = await session.verifyAccessPin(pin);
+    if (result.ok) {
+      setPetPinPromptOpen(false);
+      setPetPinError('');
+      showNotice('Pet unlocked.');
+      return;
+    }
+    setPetPinError('PIN did not match.');
+  };
+
+  const renderBody = () => {
     if (boot.booting) {
       return (
         <Card className="empty-card">
-          <h2>Connecting to Firebase...</h2>
-          <p className="muted-text">Preparing your owner profile and pet saves.</p>
+          <h2>Loading...</h2>
         </Card>
       );
     }
@@ -193,82 +278,32 @@ function OwnerApp() {
       );
     }
 
-    if (screen === 'create') {
+    if (
+      petList.loading ||
+      !activePet ||
+      !session.pet ||
+      session.pet.id !== activePet.id
+    ) {
       return (
-        <CreatePetScreen
-          defaultTheme={boot.settings.defaultTheme}
-          existingPets={petList.pets}
-          saving={session.saving}
-          onCancel={() => setScreen('home')}
-          onCreate={handleCreate}
-        />
-      );
-    }
-
-    if (screen === 'load') {
-      return (
-        <LoadPetsScreen
-          pets={petList.pets}
-          loading={petList.loading}
-          error={petList.error}
-          onBack={() => setScreen('home')}
-          onSelect={handleSelectPet}
-        />
-      );
-    }
-
-    if (screen === 'settings') {
-      return (
-        <SettingsScreen
-          settings={boot.settings}
-          onBack={() => setScreen('home')}
-          onChange={boot.setSettings}
-          onClearLocalCache={() => {
-            boot.resetLocalData();
-            showNotice('Local cache cleared.');
-          }}
-        />
-      );
-    }
-
-    if (screen === 'help') {
-      return <HelpScreen onBack={() => setScreen('home')} />;
-    }
-
-    if (screen === 'pet' && session.pet) {
-      return (
-        <PetScreen
-          pet={session.pet}
-          saving={session.saving}
-          settings={boot.settings}
-          lastReaction={session.lastReaction}
-          events={session.lastEvents}
-          canEdit={canEdit}
-          canAdmin={canAdmin}
-          onBack={() => setScreen('load')}
-          onHome={() => setScreen('home')}
-          onAction={session.performAction}
-          onThemeChange={handleThemeChange}
-          onSharePet={handleSharePet}
-          onRequestUnlock={session.verifyAccessPin}
-          onRequestParentUnlock={session.unlockParentTools}
-          onLock={session.lockPetSession}
-          onDeletePet={handleDeletePet}
-        />
+        <Card className="empty-card">
+          <h2>Getting your pet ready...</h2>
+        </Card>
       );
     }
 
     return (
-      <HomeScreen
-        pets={petList.pets}
-        featuredPet={featuredPet}
-        onCreate={() => setScreen('create')}
-        onLoad={() => setScreen('load')}
-        onSettings={() => setScreen('settings')}
-        onHelp={() => setScreen('help')}
-        onShareApp={handleShareApp}
-        onShareAppWhatsApp={() => openWhatsAppShare('Play Tamagotchi with me.', buildAppShareUrl())}
-        onContinue={handleSelectPet}
+      <KidPlayScreen
+        pet={session.pet}
+        needs={kidNeeds}
+        saving={session.saving}
+        canEdit={canEdit}
+        showMedicine={shouldShowMedicine(session.pet)}
+        lastReaction={boot.settings.soundEnabled ? session.lastReaction : 'tap'}
+        onKidAction={handleKidAction}
+        onUnlockPet={() => {
+          setPetPinPromptOpen(true);
+          setPetPinError('');
+        }}
       />
     );
   };
@@ -277,15 +312,63 @@ function OwnerApp() {
     <div onPointerDownCapture={() => unlockAudio()}>
       <AppShell
         title="Tamagotchi"
-        subtitle="Mobile-first virtual pet"
+        subtitle="Tap to care"
         notice={notice}
-        onHome={screen !== 'home' ? () => setScreen('home') : null}
-        actions={
-          null
-        }
+        onTitleHold={openParentAccess}
+        actions={null}
       >
-        {renderScreen()}
+        {renderBody()}
       </AppShell>
+
+      <ParentGateModal
+        open={parentGateOpen}
+        hasParentPin={hasParentPin}
+        onClose={() => setParentGateOpen(false)}
+        onSetup={handleParentSetup}
+        onUnlock={handleParentUnlock}
+      />
+
+      <ParentPanel
+        open={parentPanelOpen}
+        pets={petList.pets}
+        selectedPetId={selectedPetId}
+        settings={boot.settings}
+        onClose={() => setParentPanelOpen(false)}
+        onLockGate={() => {
+          lockParentGate();
+          setParentPanelOpen(false);
+          showNotice('Parent space locked.');
+        }}
+        onSelectPet={(petId) => {
+          setSelectedPetId(petId);
+          setLastPetId(petId);
+        }}
+        onCreatePet={async (input) => {
+          const newPet = await session.createPetSession(input);
+          setSelectedPetId(newPet.id);
+          setLastPetId(newPet.id);
+          showNotice('New pet created.');
+        }}
+        onRenamePet={handleRenamePet}
+        onDeletePet={handleDeletePet}
+        onShareApp={handleAppShare}
+        onSharePet={handlePetShare}
+        onSettingsChange={boot.setSettings}
+        onAdminAction={handleAdminAction}
+      />
+
+      <PinPrompt
+        open={petPinPromptOpen}
+        title="Unlock Pet"
+        description="Enter this pet PIN."
+        error={petPinError}
+        confirmLabel="Unlock"
+        onClose={() => {
+          setPetPinPromptOpen(false);
+          setPetPinError('');
+        }}
+        onConfirm={handleUnlockPet}
+      />
     </div>
   );
 }
