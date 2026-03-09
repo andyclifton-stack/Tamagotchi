@@ -86,7 +86,7 @@ export default function KidPlayScreen({
           <p className="eyebrow">{formatStage(pet.currentStage)}</p>
           <h2>{pet.name}</h2>
           <p className="kid-pet-card__meta">
-            {toTitleCase(pet.timeOfDay)} {pet.currentStage === 'egg' ? `• ${getEggCountdown(pet, now)}` : ''}
+            {toTitleCase(pet.timeOfDay)} {pet.currentStage === 'egg' ? `- ${getEggCountdown(pet, now)}` : ''}
           </p>
         </div>
         <PetScene
