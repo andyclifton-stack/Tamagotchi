@@ -63,6 +63,8 @@ export default function KidPlayScreen({
   onUnlockPet
 }) {
   const [now, setNow] = useState(() => Date.now());
+  const [cleanMode, setCleanMode] = useState(false);
+  const [cleanProgress, setCleanProgress] = useState(0);
 
   useEffect(() => {
     const timerId = window.setInterval(() => {
@@ -70,6 +72,11 @@ export default function KidPlayScreen({
     }, 30000);
     return () => window.clearInterval(timerId);
   }, []);
+
+  useEffect(() => {
+    setCleanMode(false);
+    setCleanProgress(0);
+  }, [pet?.id]);
 
   if (!pet) {
     return (
@@ -94,6 +101,14 @@ export default function KidPlayScreen({
           themeId="soft3d"
           reaction={lastReaction}
           compact={false}
+          cleanMode={cleanMode}
+          cleanProgress={cleanProgress}
+          onCleanProgress={setCleanProgress}
+          onCleanComplete={async () => {
+            setCleanMode(false);
+            setCleanProgress(0);
+            await onKidAction('clean');
+          }}
         />
 
         {!canEdit && pet.pinEnabled ? (
@@ -120,36 +135,47 @@ export default function KidPlayScreen({
       </Card>
 
       <Card className="kid-actions-card">
+        {cleanMode ? (
+          <p className="kid-mode-hint">Drag the sponge over Buddy until the bar is full.</p>
+        ) : null}
         <div className="kid-actions-grid">
           <ActionButton
             icon="F"
             label="Feed"
-            disabled={saving || !canEdit}
+            disabled={saving || !canEdit || cleanMode}
             onClick={() => onKidAction('feed')}
           />
           <ActionButton
             icon="P"
             label="Play"
-            disabled={saving || !canEdit}
+            disabled={saving || !canEdit || cleanMode}
             onClick={() => onKidAction('play')}
           />
           <ActionButton
             icon="C"
-            label="Clean"
+            label={cleanMode ? 'Scrub!' : 'Clean'}
             disabled={saving || !canEdit}
-            onClick={() => onKidAction('clean')}
+            onClick={() => {
+              if (cleanMode) {
+                setCleanMode(false);
+                setCleanProgress(0);
+                return;
+              }
+              setCleanMode(true);
+              setCleanProgress(0);
+            }}
           />
           <ActionButton
             icon="Z"
             label="Sleep"
-            disabled={saving || !canEdit}
+            disabled={saving || !canEdit || cleanMode}
             onClick={() => onKidAction('sleep')}
           />
           {showMedicine ? (
             <ActionButton
               icon="M"
               label="Medicine"
-              disabled={saving || !canEdit}
+              disabled={saving || !canEdit || cleanMode}
               onClick={() => onKidAction('medicine')}
             />
           ) : null}

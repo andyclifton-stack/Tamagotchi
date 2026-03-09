@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { PET_TYPE_MAP } from '../data/petTypes';
 import { THEME_MAP } from '../data/themes';
+import { getCoverageCell, getCoverageProgress } from '../lib/cleanInteraction';
 
 function expressionForMood(mood) {
   if (mood === 'sleeping') return 'sleep';
@@ -145,18 +146,57 @@ function SvgPet({ pet, species }) {
   );
 }
 
-export default function PetScene({ pet, themeId, reaction = 'tap', compact = false }) {
+export default function PetScene({
+  pet,
+  themeId,
+  reaction = 'tap',
+  compact = false,
+  cleanMode = false,
+  cleanProgress = 0,
+  onCleanProgress,
+  onCleanComplete
+}) {
   const canvasRef = useRef(null);
+  const roomRef = useRef(null);
+  const pointerActiveRef = useRef(false);
+  const visitedCellsRef = useRef(new Set());
+  const completeFiredRef = useRef(false);
+  const [toolPosition, setToolPosition] = useState({ x: 0.5, y: 0.72, visible: false });
   const species = PET_TYPE_MAP[pet.speciesId];
   const theme = THEME_MAP[themeId] || THEME_MAP.soft3d;
   const stats = pet.stats || { ...pet.statsPreview, messCount: 0 };
   const status = pet.status || pet.statusPreview || {};
+  const scrubGoal = 0.72;
+  const dustAlpha = Math.max(0, 1 - cleanProgress);
+  const dustSpots = [
+    { left: '22%', top: '26%' },
+    { left: '70%', top: '24%' },
+    { left: '58%', top: '42%' },
+    { left: '34%', top: '58%' },
+    { left: '78%', top: '64%' }
+  ];
 
   useEffect(() => {
     if (theme.family === 'retro') {
       drawRetroPet(canvasRef.current, pet, species);
     }
   }, [theme.family, pet, species]);
+
+  useEffect(() => {
+    if (!cleanMode) {
+      pointerActiveRef.current = false;
+      visitedCellsRef.current = new Set();
+      completeFiredRef.current = false;
+      setToolPosition({ x: 0.5, y: 0.72, visible: false });
+      return;
+    }
+
+    visitedCellsRef.current = new Set();
+    completeFiredRef.current = false;
+    if (typeof onCleanProgress === 'function') {
+      onCleanProgress(0);
+    }
+  }, [cleanMode, onCleanProgress]);
 
   const moodClass = useMemo(() => {
     if (status?.careCenterRest) return 'is-resting';
@@ -166,9 +206,62 @@ export default function PetScene({ pet, themeId, reaction = 'tap', compact = fal
     return 'is-content';
   }, [stats.messCount, status]);
 
+  const handleScrubPoint = (clientX, clientY) => {
+    if (!cleanMode || !roomRef.current) return;
+    const rect = roomRef.current.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+
+    const x = Math.min(rect.width, Math.max(0, clientX - rect.left));
+    const y = Math.min(rect.height, Math.max(0, clientY - rect.top));
+    const relX = x / rect.width;
+    const relY = y / rect.height;
+
+    setToolPosition({ x: relX, y: relY, visible: true });
+
+    const key = getCoverageCell(relX, relY);
+    if (visitedCellsRef.current.has(key)) return;
+    visitedCellsRef.current.add(key);
+
+    const progress = getCoverageProgress(visitedCellsRef.current.size);
+    if (typeof onCleanProgress === 'function') {
+      onCleanProgress(progress);
+    }
+
+    if (progress >= scrubGoal && !completeFiredRef.current) {
+      completeFiredRef.current = true;
+      if (typeof onCleanComplete === 'function') {
+        onCleanComplete();
+      }
+    }
+  };
+
+  const handlePointerDown = (event) => {
+    if (!cleanMode) return;
+    pointerActiveRef.current = true;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    handleScrubPoint(event.clientX, event.clientY);
+  };
+
+  const handlePointerMove = (event) => {
+    if (!cleanMode || !pointerActiveRef.current) return;
+    handleScrubPoint(event.clientX, event.clientY);
+  };
+
+  const handlePointerUp = () => {
+    pointerActiveRef.current = false;
+    setToolPosition((current) => ({ ...current, visible: false }));
+  };
+
   return (
     <div className={`pet-scene ${theme.roomClass} ${moodClass}${compact ? ' is-compact' : ''}`}>
-      <div className={`pet-scene__room pet-scene__room--${pet.timeOfDay || 'day'}`}>
+      <div
+        ref={roomRef}
+        className={`pet-scene__room pet-scene__room--${pet.timeOfDay || 'day'}${cleanMode ? ' is-clean-mode' : ''}`}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerUp}
+      >
         <div className="pet-scene__sun" />
         <div className="pet-scene__window" />
         <div className="pet-scene__floor" />
@@ -184,6 +277,43 @@ export default function PetScene({ pet, themeId, reaction = 'tap', compact = fal
         {status?.isSick ? <div className="scene-badge scene-badge--ill">Sick</div> : null}
         {stats.messCount > 0 ? <div className="scene-badge scene-badge--mess">Mess x{stats.messCount}</div> : null}
         {status?.careCenterRest ? <div className="scene-overlay-copy">Care Center Rest</div> : null}
+        {cleanMode ? (
+          <>
+            <div className="clean-overlay">
+              <div className="clean-overlay__head">
+                <span>Scrub to clean</span>
+                <strong>{Math.round(cleanProgress * 100)}%</strong>
+              </div>
+              <div className="clean-overlay__track">
+                <div
+                  className="clean-overlay__fill"
+                  style={{ width: `${Math.round(Math.min(100, cleanProgress * 100))}%` }}
+                />
+              </div>
+            </div>
+            {dustSpots.map((spot, index) => (
+              <div
+                key={`dust-${index}`}
+                className="clean-dust"
+                style={{
+                  left: spot.left,
+                  top: spot.top,
+                  opacity: Math.max(0, dustAlpha - index * 0.08)
+                }}
+              />
+            ))}
+            <div
+              className={`clean-tool${toolPosition.visible ? ' is-visible' : ''}`}
+              style={{
+                left: `${Math.round(toolPosition.x * 100)}%`,
+                top: `${Math.round(toolPosition.y * 100)}%`
+              }}
+              aria-hidden="true"
+            >
+              S
+            </div>
+          </>
+        ) : null}
       </div>
     </div>
   );
