@@ -4,6 +4,7 @@ import {
   getCoverageProgress,
   getFeedDeliveryProgress,
   getPlayTargetCell,
+  getSleepPullProgress,
   isFeedTargetHit,
   isPlayTargetHit
 } from '../cleanInteraction';
@@ -33,5 +34,11 @@ describe('clean interaction helpers', () => {
     expect(isPlayTargetHit(0.5, 0.59)).toBe(true);
     expect(isPlayTargetHit(0.92, 0.2)).toBe(false);
     expect(getPlayTargetCell(0.5, 0.59)).toBe('3:3');
+  });
+
+  it('calculates pull-down sleep progress', () => {
+    expect(getSleepPullProgress(0.02)).toBe(0);
+    expect(getSleepPullProgress(0.47)).toBeCloseTo(0.5, 1);
+    expect(getSleepPullProgress(0.95)).toBe(1);
   });
 });

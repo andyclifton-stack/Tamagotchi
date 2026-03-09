@@ -65,6 +65,8 @@ export default function KidPlayScreen({
   const [now, setNow] = useState(() => Date.now());
   const [interactionMode, setInteractionMode] = useState('');
   const [interactionProgress, setInteractionProgress] = useState(0);
+  const modeActive = Boolean(interactionMode);
+  const isMode = (mode) => interactionMode === mode;
 
   useEffect(() => {
     const timerId = window.setInterval(() => {
@@ -144,13 +146,16 @@ export default function KidPlayScreen({
         {interactionMode === 'play' ? (
           <p className="kid-mode-hint">Drag the tickle tool over Buddy until the bar is full.</p>
         ) : null}
+        {interactionMode === 'sleep' ? (
+          <p className="kid-mode-hint">Pull the moon down to close night mode.</p>
+        ) : null}
         <div className="kid-actions-grid">
           <ActionButton
             icon="F"
-            label={interactionMode === 'feed' ? 'Drop food!' : 'Feed'}
-            disabled={saving || !canEdit || (interactionMode === 'clean')}
+            label={isMode('feed') ? 'Drop food!' : 'Feed'}
+            disabled={saving || !canEdit || (modeActive && !isMode('feed'))}
             onClick={() => {
-              if (interactionMode === 'feed') {
+              if (isMode('feed')) {
                 setInteractionMode('');
                 setInteractionProgress(0);
                 return;
@@ -161,10 +166,10 @@ export default function KidPlayScreen({
           />
           <ActionButton
             icon="P"
-            label={interactionMode === 'play' ? 'Tickle!' : 'Play'}
-            disabled={saving || !canEdit || interactionMode === 'clean' || interactionMode === 'feed'}
+            label={isMode('play') ? 'Tickle!' : 'Play'}
+            disabled={saving || !canEdit || (modeActive && !isMode('play'))}
             onClick={() => {
-              if (interactionMode === 'play') {
+              if (isMode('play')) {
                 setInteractionMode('');
                 setInteractionProgress(0);
                 return;
@@ -175,10 +180,10 @@ export default function KidPlayScreen({
           />
           <ActionButton
             icon="C"
-            label={interactionMode === 'clean' ? 'Scrub!' : 'Clean'}
-            disabled={saving || !canEdit}
+            label={isMode('clean') ? 'Scrub!' : 'Clean'}
+            disabled={saving || !canEdit || (modeActive && !isMode('clean'))}
             onClick={() => {
-              if (interactionMode === 'clean') {
+              if (isMode('clean')) {
                 setInteractionMode('');
                 setInteractionProgress(0);
                 return;
@@ -189,15 +194,23 @@ export default function KidPlayScreen({
           />
           <ActionButton
             icon="Z"
-            label="Sleep"
-            disabled={saving || !canEdit || Boolean(interactionMode)}
-            onClick={() => onKidAction('sleep')}
+            label={isMode('sleep') ? 'Night!' : 'Sleep'}
+            disabled={saving || !canEdit || (modeActive && !isMode('sleep'))}
+            onClick={() => {
+              if (isMode('sleep')) {
+                setInteractionMode('');
+                setInteractionProgress(0);
+                return;
+              }
+              setInteractionMode('sleep');
+              setInteractionProgress(0);
+            }}
           />
           {showMedicine ? (
             <ActionButton
               icon="M"
               label="Medicine"
-              disabled={saving || !canEdit || Boolean(interactionMode)}
+              disabled={saving || !canEdit || modeActive}
               onClick={() => onKidAction('medicine')}
             />
           ) : null}

@@ -48,3 +48,10 @@ export function getPlayTargetCell(relX, relY, cols = 6, rows = 6) {
   const row = Math.min(rows - 1, Math.floor(y * rows));
   return `${col}:${row}`;
 }
+
+export function getSleepPullProgress(relY, start = 0.08, end = 0.86) {
+  const y = clamp01(relY);
+  if (y <= start) return 0;
+  if (y >= end) return 1;
+  return clamp01((y - start) / (end - start));
+}

@@ -607,6 +607,49 @@
   animation: feedPulse 900ms ease-in-out infinite;
 }
 
+.sleep-item-source {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  top: 14px;
+  transform: translateX(-50%);
+  width: 64px;
+  height: 52px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(55, 82, 139, 0.24);
+  box-shadow: 0 8px 16px rgba(21, 40, 72, 0.18);
+}
+
+.sleep-item-source span {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.sleep-target-band {
+  position: absolute;
+  z-index: 4;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 100%;
+  background: linear-gradient(180deg, rgba(30, 45, 88, 0.18), rgba(30, 45, 88, 0.02));
+  pointer-events: none;
+}
+
+.sleep-curtain {
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  right: 0;
+  top: 0;
+  background: linear-gradient(180deg, rgba(31, 43, 76, 0.52), rgba(31, 43, 76, 0.28));
+  pointer-events: none;
+  transition: height 90ms ease;
+}
+
 .clean-tool {
   position: absolute;
   z-index: 6;
