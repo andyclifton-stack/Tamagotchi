@@ -19,7 +19,7 @@ function NeedBar({ label, value, tone }) {
   );
 }
 
-function ActionButton({ emoji, label, disabled, onClick }) {
+function ActionButton({ icon, label, disabled, onClick }) {
   return (
     <button
       type="button"
@@ -28,7 +28,7 @@ function ActionButton({ emoji, label, disabled, onClick }) {
       onClick={onClick}
     >
       <span className="kid-action__emoji" aria-hidden="true">
-        {emoji}
+        {icon}
       </span>
       <span className="kid-action__label">{label}</span>
     </button>
@@ -93,32 +93,32 @@ export default function KidPlayScreen({
       <Card className="kid-actions-card">
         <div className="kid-actions-grid">
           <ActionButton
-            emoji="🍽"
+            icon="F"
             label="Feed"
             disabled={saving || !canEdit}
             onClick={() => onKidAction('feed')}
           />
           <ActionButton
-            emoji="🎈"
+            icon="P"
             label="Play"
             disabled={saving || !canEdit}
             onClick={() => onKidAction('play')}
           />
           <ActionButton
-            emoji="🧼"
+            icon="C"
             label="Clean"
             disabled={saving || !canEdit}
             onClick={() => onKidAction('clean')}
           />
           <ActionButton
-            emoji="🌙"
+            icon="Z"
             label="Sleep"
             disabled={saving || !canEdit}
             onClick={() => onKidAction('sleep')}
           />
           {showMedicine ? (
             <ActionButton
-              emoji="💊"
+              icon="M"
               label="Medicine"
               disabled={saving || !canEdit}
               onClick={() => onKidAction('medicine')}
