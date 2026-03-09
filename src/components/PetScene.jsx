@@ -159,28 +159,33 @@ export default function PetScene({
   themeId,
   reaction = 'tap',
   compact = false,
-  interactionMode = '',
-  interactionProgress = 0,
-  onInteractionProgress,
+  interactive = false,
+  showMedicineTool = false,
   onInteractionComplete
 }) {
   const canvasRef = useRef(null);
   const roomRef = useRef(null);
   const pointerActiveRef = useRef(false);
+  const activeModeRef = useRef('');
   const visitedCellsRef = useRef(new Set());
   const feedDropCountRef = useRef(0);
   const feedWasInsideRef = useRef(false);
   const sleepProgressRef = useRef(0);
   const completeFiredRef = useRef(false);
+  const burstTimersRef = useRef([]);
   const [toolPosition, setToolPosition] = useState({ x: 0.5, y: 0.72, visible: false });
+  const [activeMode, setActiveMode] = useState('');
+  const [interactionProgress, setInteractionProgress] = useState(0);
+  const [bursts, setBursts] = useState([]);
   const species = PET_TYPE_MAP[pet.speciesId];
   const theme = THEME_MAP[themeId] || THEME_MAP.soft3d;
   const stats = pet.stats || { ...pet.statsPreview, messCount: 0 };
   const status = pet.status || pet.statusPreview || {};
-  const cleanMode = interactionMode === 'clean';
-  const feedMode = interactionMode === 'feed';
-  const playMode = interactionMode === 'play';
-  const sleepMode = interactionMode === 'sleep';
+  const cleanMode = activeMode === 'clean';
+  const feedMode = activeMode === 'feed';
+  const playMode = activeMode === 'play';
+  const sleepMode = activeMode === 'sleep';
+  const medicineMode = activeMode === 'medicine';
   const scrubGoal = 0.72;
   const feedGoal = 1;
   const dustAlpha = Math.max(0, 1 - interactionProgress);
@@ -199,26 +204,11 @@ export default function PetScene({
   }, [theme.family, pet, species]);
 
   useEffect(() => {
-    if (!cleanMode && !feedMode && !playMode && !sleepMode) {
-      pointerActiveRef.current = false;
-      visitedCellsRef.current = new Set();
-      feedDropCountRef.current = 0;
-      feedWasInsideRef.current = false;
-      sleepProgressRef.current = 0;
-      completeFiredRef.current = false;
-      setToolPosition({ x: 0.5, y: 0.72, visible: false });
-      return;
-    }
-
-    visitedCellsRef.current = new Set();
-    feedDropCountRef.current = 0;
-    feedWasInsideRef.current = false;
-    sleepProgressRef.current = 0;
-    completeFiredRef.current = false;
-    if (typeof onInteractionProgress === 'function') {
-      onInteractionProgress(0);
-    }
-  }, [cleanMode, feedMode, playMode, sleepMode, onInteractionProgress]);
+    return () => {
+      burstTimersRef.current.forEach((id) => window.clearTimeout(id));
+      burstTimersRef.current = [];
+    };
+  }, []);
 
   const moodClass = useMemo(() => {
     if (status?.careCenterRest) return 'is-resting';
@@ -228,8 +218,50 @@ export default function PetScene({
     return 'is-content';
   }, [stats.messCount, status]);
 
-  const handleInteractionPoint = (clientX, clientY) => {
-    if ((!cleanMode && !feedMode && !playMode && !sleepMode) || !roomRef.current) return;
+  const finishInteraction = (mode, relX = 0.5, relY = 0.6) => {
+    const iconMap = {
+      clean: '✨',
+      feed: '🍎',
+      play: '🎉',
+      sleep: '🌙',
+      medicine: '💚'
+    };
+    const burst = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      x: relX,
+      y: relY,
+      icon: iconMap[mode] || '✨'
+    };
+    setBursts((current) => [...current, burst]);
+    const timer = window.setTimeout(() => {
+      setBursts((current) => current.filter((item) => item.id !== burst.id));
+    }, 520);
+    burstTimersRef.current.push(timer);
+
+    pointerActiveRef.current = false;
+    activeModeRef.current = '';
+    completeFiredRef.current = false;
+    setActiveMode('');
+    setInteractionProgress(0);
+    setToolPosition((current) => ({ ...current, visible: false }));
+    if (typeof onInteractionComplete === 'function') {
+      onInteractionComplete(mode);
+    }
+  };
+
+  const resetModeState = (mode) => {
+    activeModeRef.current = mode;
+    setActiveMode(mode);
+    setInteractionProgress(0);
+    visitedCellsRef.current = new Set();
+    feedDropCountRef.current = 0;
+    feedWasInsideRef.current = false;
+    sleepProgressRef.current = 0;
+    completeFiredRef.current = false;
+  };
+
+  const handleInteractionPoint = (mode, clientX, clientY) => {
+    if (!mode || !roomRef.current) return;
     const rect = roomRef.current.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
 
@@ -240,103 +272,83 @@ export default function PetScene({
 
     setToolPosition({ x: relX, y: relY, visible: true });
 
-    if (cleanMode) {
+    if (mode === 'clean') {
       const key = getCoverageCell(relX, relY);
       if (visitedCellsRef.current.has(key)) return;
       visitedCellsRef.current.add(key);
 
       const progress = getCoverageProgress(visitedCellsRef.current.size);
-      if (typeof onInteractionProgress === 'function') {
-        onInteractionProgress(progress);
-      }
+      setInteractionProgress(progress);
 
       if (progress >= scrubGoal && !completeFiredRef.current) {
         completeFiredRef.current = true;
-        if (typeof onInteractionComplete === 'function') {
-          onInteractionComplete('clean');
-        }
+        finishInteraction('clean', relX, relY);
       }
       return;
     }
 
-    if (feedMode) {
+    if (mode === 'feed' || mode === 'medicine') {
       const insideTarget = isFeedTargetHit(relX, relY);
       if (insideTarget && !feedWasInsideRef.current) {
         feedDropCountRef.current += 1;
-        const progress = getFeedDeliveryProgress(feedDropCountRef.current, 3);
-        if (typeof onInteractionProgress === 'function') {
-          onInteractionProgress(progress);
-        }
+        const required = mode === 'medicine' ? 1 : 3;
+        const progress = getFeedDeliveryProgress(feedDropCountRef.current, required);
+        setInteractionProgress(progress);
         if (progress >= feedGoal && !completeFiredRef.current) {
           completeFiredRef.current = true;
-          if (typeof onInteractionComplete === 'function') {
-            onInteractionComplete('feed');
-          }
+          finishInteraction(mode, relX, relY);
         }
       }
       feedWasInsideRef.current = insideTarget;
       return;
     }
 
-    if (playMode) {
+    if (mode === 'play') {
       if (!isPlayTargetHit(relX, relY)) return;
       const key = getPlayTargetCell(relX, relY);
       if (visitedCellsRef.current.has(key)) return;
       visitedCellsRef.current.add(key);
 
       const progress = getCoverageProgress(visitedCellsRef.current.size, 6, 6);
-      if (typeof onInteractionProgress === 'function') {
-        onInteractionProgress(progress);
-      }
+      setInteractionProgress(progress);
       if (progress >= 0.58 && !completeFiredRef.current) {
         completeFiredRef.current = true;
-        if (typeof onInteractionComplete === 'function') {
-          onInteractionComplete('play');
-        }
+        finishInteraction('play', relX, relY);
       }
       return;
     }
 
-    if (sleepMode) {
+    if (mode === 'sleep') {
       const next = Math.max(
         sleepProgressRef.current,
         getSleepPullProgress(relY)
       );
       sleepProgressRef.current = next;
-      if (typeof onInteractionProgress === 'function') {
-        onInteractionProgress(next);
-      }
+      setInteractionProgress(next);
       if (next >= 0.98 && !completeFiredRef.current) {
         completeFiredRef.current = true;
-        if (typeof onInteractionComplete === 'function') {
-          onInteractionComplete('sleep');
-        }
+        finishInteraction('sleep', relX, relY);
       }
     }
   };
 
   const handlePointerDown = (event) => {
-    if (!cleanMode && !feedMode && !playMode && !sleepMode) return;
-    if (feedMode) {
-      const fromSource = Boolean(event.target.closest?.('.feed-item-source'));
-      if (!fromSource) return;
-    }
-    if (playMode) {
-      const fromSource = Boolean(event.target.closest?.('.play-item-source'));
-      if (!fromSource) return;
-    }
-    if (sleepMode) {
-      const fromSource = Boolean(event.target.closest?.('.sleep-item-source'));
-      if (!fromSource) return;
-    }
+    if (!interactive) return;
+    const source = event.target.closest?.('[data-tool]');
+    if (!source) return;
+    const mode = source.getAttribute('data-tool') || '';
+    if (!mode) return;
+
+    resetModeState(mode);
     pointerActiveRef.current = true;
     event.currentTarget.setPointerCapture?.(event.pointerId);
-    handleInteractionPoint(event.clientX, event.clientY);
+    handleInteractionPoint(mode, event.clientX, event.clientY);
   };
 
   const handlePointerMove = (event) => {
-    if ((!cleanMode && !feedMode && !playMode && !sleepMode) || !pointerActiveRef.current) return;
-    handleInteractionPoint(event.clientX, event.clientY);
+    const mode = activeModeRef.current;
+    if (!mode || !pointerActiveRef.current) return;
+    handleInteractionPoint(mode, event.clientX, event.clientY);
   };
 
   const handlePointerUp = () => {
@@ -349,7 +361,7 @@ export default function PetScene({
     <div className={`pet-scene ${theme.roomClass} ${moodClass}${compact ? ' is-compact' : ''}`}>
       <div
         ref={roomRef}
-        className={`pet-scene__room pet-scene__room--${pet.timeOfDay || 'day'}${cleanMode || feedMode || playMode || sleepMode ? ' is-clean-mode' : ''}`}
+        className={`pet-scene__room pet-scene__room--${pet.timeOfDay || 'day'}${activeMode ? ' is-clean-mode' : ''}`}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -370,11 +382,11 @@ export default function PetScene({
         {status?.isSick ? <div className="scene-badge scene-badge--ill">Sick</div> : null}
         {stats.messCount > 0 ? <div className="scene-badge scene-badge--mess">Mess x{stats.messCount}</div> : null}
         {status?.careCenterRest ? <div className="scene-overlay-copy">Care Center Rest</div> : null}
-        {cleanMode || feedMode || playMode || sleepMode ? (
+        {activeMode ? (
           <>
             <div className="clean-overlay">
               <div className="clean-overlay__head">
-                <span>{cleanMode ? 'Scrub to clean' : feedMode ? 'Drag food to mouth' : playMode ? 'Tickle Buddy' : 'Pull down to sleep'}</span>
+                <span>{cleanMode ? 'Scrub to clean' : feedMode ? 'Drag food to mouth' : playMode ? 'Tickle Buddy' : medicineMode ? 'Give medicine' : 'Pull down to sleep'}</span>
                 <strong>{Math.round(interactionProgress * 100)}%</strong>
               </div>
               <div className="clean-overlay__track">
@@ -398,24 +410,9 @@ export default function PetScene({
               ))
               : (
                 <>
-                  {feedMode ? <div className="feed-target-ring" aria-hidden="true" /> : null}
+                  {(feedMode || medicineMode) ? <div className="feed-target-ring" aria-hidden="true" /> : null}
                   {playMode ? <div className="play-target-glow" aria-hidden="true" /> : null}
                   {sleepMode ? <div className="sleep-target-band" aria-hidden="true" /> : null}
-                  {feedMode ? (
-                    <div className="feed-item-source" aria-hidden="true">
-                      <span>🍎</span>
-                    </div>
-                  ) : null}
-                  {playMode ? (
-                    <div className="play-item-source" aria-hidden="true">
-                      <span>🪶</span>
-                    </div>
-                  ) : null}
-                  {sleepMode ? (
-                    <div className="sleep-item-source" aria-hidden="true">
-                      <span>🌙</span>
-                    </div>
-                  ) : null}
                 </>
               )}
             <div
@@ -426,7 +423,7 @@ export default function PetScene({
               }}
               aria-hidden="true"
             >
-              {cleanMode ? 'S' : feedMode ? '🍎' : playMode ? '🪶' : '🌙'}
+              {cleanMode ? 'S' : feedMode ? '🍎' : playMode ? '🪶' : medicineMode ? '💊' : '🌙'}
             </div>
             {sleepMode ? (
               <div
@@ -437,6 +434,42 @@ export default function PetScene({
             ) : null}
           </>
         ) : null}
+
+        {interactive && !compact ? (
+          <div className="tool-bar">
+            <button type="button" className="tool-source tool-source--feed" data-tool="feed">
+              🍎
+            </button>
+            <button type="button" className="tool-source tool-source--play" data-tool="play">
+              🪶
+            </button>
+            <button type="button" className="tool-source tool-source--clean" data-tool="clean">
+              S
+            </button>
+            <button type="button" className="tool-source tool-source--sleep" data-tool="sleep">
+              🌙
+            </button>
+            {showMedicineTool ? (
+              <button type="button" className="tool-source tool-source--medicine" data-tool="medicine">
+                💊
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
+        {bursts.map((burst) => (
+          <span
+            key={burst.id}
+            className="scene-burst"
+            style={{
+              left: `${Math.round(burst.x * 100)}%`,
+              top: `${Math.round(burst.y * 100)}%`
+            }}
+            aria-hidden="true"
+          >
+            {burst.icon}
+          </span>
+        ))}
       </div>
     </div>
   );

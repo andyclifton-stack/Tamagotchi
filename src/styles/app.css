@@ -650,6 +650,52 @@
   transition: height 90ms ease;
 }
 
+.tool-bar {
+  position: absolute;
+  z-index: 7;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.tool-bar:has(.tool-source--medicine) {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.tool-source {
+  border: none;
+  border-radius: 14px;
+  min-height: 48px;
+  display: grid;
+  place-items: center;
+  font-size: 1.5rem;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(31, 54, 95, 0.18);
+  box-shadow: 0 8px 16px rgba(21, 40, 72, 0.16);
+}
+
+.tool-source:active {
+  transform: scale(0.98);
+}
+
+.tool-source--clean,
+.tool-source--medicine {
+  font-size: 1.3rem;
+  font-weight: 900;
+}
+
+.scene-burst {
+  position: absolute;
+  z-index: 8;
+  transform: translate(-50%, -50%);
+  font-size: 1.5rem;
+  animation: burstPop 520ms ease forwards;
+  pointer-events: none;
+}
+
 .clean-tool {
   position: absolute;
   z-index: 6;
@@ -1092,6 +1138,12 @@
   0% { transform: translateY(0); }
   50% { transform: translateY(-4px); }
   100% { transform: translateY(0); }
+}
+
+@keyframes burstPop {
+  0% { transform: translate(-50%, -50%) scale(0.6); opacity: 0; }
+  20% { transform: translate(-50%, -80%) scale(1.1); opacity: 1; }
+  100% { transform: translate(-50%, -140%) scale(1.05); opacity: 0; }
 }
 
 @media (min-width: 720px) {

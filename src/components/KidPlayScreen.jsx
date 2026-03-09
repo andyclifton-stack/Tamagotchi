@@ -36,22 +36,6 @@ function NeedBar({ label, value, tone }) {
   );
 }
 
-function ActionButton({ icon, label, disabled, onClick }) {
-  return (
-    <button
-      type="button"
-      className="kid-action"
-      disabled={disabled}
-      onClick={onClick}
-    >
-      <span className="kid-action__emoji" aria-hidden="true">
-        {icon}
-      </span>
-      <span className="kid-action__label">{label}</span>
-    </button>
-  );
-}
-
 export default function KidPlayScreen({
   pet,
   needs,
@@ -63,10 +47,6 @@ export default function KidPlayScreen({
   onUnlockPet
 }) {
   const [now, setNow] = useState(() => Date.now());
-  const [interactionMode, setInteractionMode] = useState('');
-  const [interactionProgress, setInteractionProgress] = useState(0);
-  const modeActive = Boolean(interactionMode);
-  const isMode = (mode) => interactionMode === mode;
 
   useEffect(() => {
     const timerId = window.setInterval(() => {
@@ -74,11 +54,6 @@ export default function KidPlayScreen({
     }, 30000);
     return () => window.clearInterval(timerId);
   }, []);
-
-  useEffect(() => {
-    setInteractionMode('');
-    setInteractionProgress(0);
-  }, [pet?.id]);
 
   if (!pet) {
     return (
@@ -103,12 +78,9 @@ export default function KidPlayScreen({
           themeId="soft3d"
           reaction={lastReaction}
           compact={false}
-          interactionMode={interactionMode}
-          interactionProgress={interactionProgress}
-          onInteractionProgress={setInteractionProgress}
+          interactive={canEdit && !saving}
+          showMedicineTool={showMedicine}
           onInteractionComplete={async (mode) => {
-            setInteractionMode('');
-            setInteractionProgress(0);
             await onKidAction(mode);
           }}
         />
@@ -137,84 +109,9 @@ export default function KidPlayScreen({
       </Card>
 
       <Card className="kid-actions-card">
-        {interactionMode === 'clean' ? (
-          <p className="kid-mode-hint">Drag the sponge over Buddy until the bar is full.</p>
-        ) : null}
-        {interactionMode === 'feed' ? (
-          <p className="kid-mode-hint">Drag the apple onto Buddy's mouth 3 times.</p>
-        ) : null}
-        {interactionMode === 'play' ? (
-          <p className="kid-mode-hint">Drag the tickle tool over Buddy until the bar is full.</p>
-        ) : null}
-        {interactionMode === 'sleep' ? (
-          <p className="kid-mode-hint">Pull the moon down to close night mode.</p>
-        ) : null}
-        <div className="kid-actions-grid">
-          <ActionButton
-            icon="F"
-            label={isMode('feed') ? 'Drop food!' : 'Feed'}
-            disabled={saving || !canEdit || (modeActive && !isMode('feed'))}
-            onClick={() => {
-              if (isMode('feed')) {
-                setInteractionMode('');
-                setInteractionProgress(0);
-                return;
-              }
-              setInteractionMode('feed');
-              setInteractionProgress(0);
-            }}
-          />
-          <ActionButton
-            icon="P"
-            label={isMode('play') ? 'Tickle!' : 'Play'}
-            disabled={saving || !canEdit || (modeActive && !isMode('play'))}
-            onClick={() => {
-              if (isMode('play')) {
-                setInteractionMode('');
-                setInteractionProgress(0);
-                return;
-              }
-              setInteractionMode('play');
-              setInteractionProgress(0);
-            }}
-          />
-          <ActionButton
-            icon="C"
-            label={isMode('clean') ? 'Scrub!' : 'Clean'}
-            disabled={saving || !canEdit || (modeActive && !isMode('clean'))}
-            onClick={() => {
-              if (isMode('clean')) {
-                setInteractionMode('');
-                setInteractionProgress(0);
-                return;
-              }
-              setInteractionMode('clean');
-              setInteractionProgress(0);
-            }}
-          />
-          <ActionButton
-            icon="Z"
-            label={isMode('sleep') ? 'Night!' : 'Sleep'}
-            disabled={saving || !canEdit || (modeActive && !isMode('sleep'))}
-            onClick={() => {
-              if (isMode('sleep')) {
-                setInteractionMode('');
-                setInteractionProgress(0);
-                return;
-              }
-              setInteractionMode('sleep');
-              setInteractionProgress(0);
-            }}
-          />
-          {showMedicine ? (
-            <ActionButton
-              icon="M"
-              label="Medicine"
-              disabled={saving || !canEdit || modeActive}
-              onClick={() => onKidAction('medicine')}
-            />
-          ) : null}
-        </div>
+        <p className="kid-mode-hint">
+          Drag tools from the pet window: apple to feed, feather to play, sponge to clean, moon to sleep.
+        </p>
       </Card>
     </div>
   );
