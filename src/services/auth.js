@@ -18,8 +18,27 @@ async function ensurePersistence() {
   persistenceReady = true;
 }
 
+async function waitForAuthRestore() {
+  if (typeof firebaseAuth.authStateReady === 'function') {
+    try {
+      await firebaseAuth.authStateReady();
+      return;
+    } catch (error) {
+      // Fall back to the listener path below.
+    }
+  }
+
+  await new Promise((resolve) => {
+    const unsubscribe = onAuthStateChanged(firebaseAuth, () => {
+      unsubscribe();
+      resolve();
+    });
+  });
+}
+
 export async function ensureAnonymousUser() {
   await ensurePersistence();
+  await waitForAuthRestore();
   if (firebaseAuth.currentUser) {
     return firebaseAuth.currentUser;
   }
