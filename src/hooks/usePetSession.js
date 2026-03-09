@@ -231,7 +231,8 @@ export function usePetSession({ petId, ownerUid }) {
       error,
       lastReaction,
       lastEvents,
-      unlockState
+      unlockState,
+      ownerUid
     ]
   );
 }
