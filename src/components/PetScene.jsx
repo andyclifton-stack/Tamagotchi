@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PET_TYPE_MAP } from '../data/petTypes';
 import { THEME_MAP } from '../data/themes';
-import { getCoverageCell, getCoverageProgress } from '../lib/cleanInteraction';
+import {
+  getCoverageCell,
+  getCoverageProgress,
+  getFeedDeliveryProgress,
+  isFeedTargetHit
+} from '../lib/cleanInteraction';
 
 function expressionForMood(mood) {
   if (mood === 'sleeping') return 'sleep';
@@ -151,23 +156,28 @@ export default function PetScene({
   themeId,
   reaction = 'tap',
   compact = false,
-  cleanMode = false,
-  cleanProgress = 0,
-  onCleanProgress,
-  onCleanComplete
+  interactionMode = '',
+  interactionProgress = 0,
+  onInteractionProgress,
+  onInteractionComplete
 }) {
   const canvasRef = useRef(null);
   const roomRef = useRef(null);
   const pointerActiveRef = useRef(false);
   const visitedCellsRef = useRef(new Set());
+  const feedDropCountRef = useRef(0);
+  const feedWasInsideRef = useRef(false);
   const completeFiredRef = useRef(false);
   const [toolPosition, setToolPosition] = useState({ x: 0.5, y: 0.72, visible: false });
   const species = PET_TYPE_MAP[pet.speciesId];
   const theme = THEME_MAP[themeId] || THEME_MAP.soft3d;
   const stats = pet.stats || { ...pet.statsPreview, messCount: 0 };
   const status = pet.status || pet.statusPreview || {};
+  const cleanMode = interactionMode === 'clean';
+  const feedMode = interactionMode === 'feed';
   const scrubGoal = 0.72;
-  const dustAlpha = Math.max(0, 1 - cleanProgress);
+  const feedGoal = 1;
+  const dustAlpha = Math.max(0, 1 - interactionProgress);
   const dustSpots = [
     { left: '22%', top: '26%' },
     { left: '70%', top: '24%' },
@@ -183,20 +193,24 @@ export default function PetScene({
   }, [theme.family, pet, species]);
 
   useEffect(() => {
-    if (!cleanMode) {
+    if (!cleanMode && !feedMode) {
       pointerActiveRef.current = false;
       visitedCellsRef.current = new Set();
+      feedDropCountRef.current = 0;
+      feedWasInsideRef.current = false;
       completeFiredRef.current = false;
       setToolPosition({ x: 0.5, y: 0.72, visible: false });
       return;
     }
 
     visitedCellsRef.current = new Set();
+    feedDropCountRef.current = 0;
+    feedWasInsideRef.current = false;
     completeFiredRef.current = false;
-    if (typeof onCleanProgress === 'function') {
-      onCleanProgress(0);
+    if (typeof onInteractionProgress === 'function') {
+      onInteractionProgress(0);
     }
-  }, [cleanMode, onCleanProgress]);
+  }, [cleanMode, feedMode, onInteractionProgress]);
 
   const moodClass = useMemo(() => {
     if (status?.careCenterRest) return 'is-resting';
@@ -206,8 +220,8 @@ export default function PetScene({
     return 'is-content';
   }, [stats.messCount, status]);
 
-  const handleScrubPoint = (clientX, clientY) => {
-    if (!cleanMode || !roomRef.current) return;
+  const handleInteractionPoint = (clientX, clientY) => {
+    if ((!cleanMode && !feedMode) || !roomRef.current) return;
     const rect = roomRef.current.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
 
@@ -218,37 +232,59 @@ export default function PetScene({
 
     setToolPosition({ x: relX, y: relY, visible: true });
 
-    const key = getCoverageCell(relX, relY);
-    if (visitedCellsRef.current.has(key)) return;
-    visitedCellsRef.current.add(key);
+    if (cleanMode) {
+      const key = getCoverageCell(relX, relY);
+      if (visitedCellsRef.current.has(key)) return;
+      visitedCellsRef.current.add(key);
 
-    const progress = getCoverageProgress(visitedCellsRef.current.size);
-    if (typeof onCleanProgress === 'function') {
-      onCleanProgress(progress);
+      const progress = getCoverageProgress(visitedCellsRef.current.size);
+      if (typeof onInteractionProgress === 'function') {
+        onInteractionProgress(progress);
+      }
+
+      if (progress >= scrubGoal && !completeFiredRef.current) {
+        completeFiredRef.current = true;
+        if (typeof onInteractionComplete === 'function') {
+          onInteractionComplete('clean');
+        }
+      }
+      return;
     }
 
-    if (progress >= scrubGoal && !completeFiredRef.current) {
-      completeFiredRef.current = true;
-      if (typeof onCleanComplete === 'function') {
-        onCleanComplete();
+    if (feedMode) {
+      const insideTarget = isFeedTargetHit(relX, relY);
+      if (insideTarget && !feedWasInsideRef.current) {
+        feedDropCountRef.current += 1;
+        const progress = getFeedDeliveryProgress(feedDropCountRef.current, 3);
+        if (typeof onInteractionProgress === 'function') {
+          onInteractionProgress(progress);
+        }
+        if (progress >= feedGoal && !completeFiredRef.current) {
+          completeFiredRef.current = true;
+          if (typeof onInteractionComplete === 'function') {
+            onInteractionComplete('feed');
+          }
+        }
       }
+      feedWasInsideRef.current = insideTarget;
     }
   };
 
   const handlePointerDown = (event) => {
-    if (!cleanMode) return;
+    if (!cleanMode && !feedMode) return;
     pointerActiveRef.current = true;
     event.currentTarget.setPointerCapture?.(event.pointerId);
-    handleScrubPoint(event.clientX, event.clientY);
+    handleInteractionPoint(event.clientX, event.clientY);
   };
 
   const handlePointerMove = (event) => {
-    if (!cleanMode || !pointerActiveRef.current) return;
-    handleScrubPoint(event.clientX, event.clientY);
+    if ((!cleanMode && !feedMode) || !pointerActiveRef.current) return;
+    handleInteractionPoint(event.clientX, event.clientY);
   };
 
   const handlePointerUp = () => {
     pointerActiveRef.current = false;
+    feedWasInsideRef.current = false;
     setToolPosition((current) => ({ ...current, visible: false }));
   };
 
@@ -256,7 +292,7 @@ export default function PetScene({
     <div className={`pet-scene ${theme.roomClass} ${moodClass}${compact ? ' is-compact' : ''}`}>
       <div
         ref={roomRef}
-        className={`pet-scene__room pet-scene__room--${pet.timeOfDay || 'day'}${cleanMode ? ' is-clean-mode' : ''}`}
+        className={`pet-scene__room pet-scene__room--${pet.timeOfDay || 'day'}${cleanMode || feedMode ? ' is-clean-mode' : ''}`}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -277,31 +313,35 @@ export default function PetScene({
         {status?.isSick ? <div className="scene-badge scene-badge--ill">Sick</div> : null}
         {stats.messCount > 0 ? <div className="scene-badge scene-badge--mess">Mess x{stats.messCount}</div> : null}
         {status?.careCenterRest ? <div className="scene-overlay-copy">Care Center Rest</div> : null}
-        {cleanMode ? (
+        {cleanMode || feedMode ? (
           <>
             <div className="clean-overlay">
               <div className="clean-overlay__head">
-                <span>Scrub to clean</span>
-                <strong>{Math.round(cleanProgress * 100)}%</strong>
+                <span>{cleanMode ? 'Scrub to clean' : 'Drag food to mouth'}</span>
+                <strong>{Math.round(interactionProgress * 100)}%</strong>
               </div>
               <div className="clean-overlay__track">
                 <div
                   className="clean-overlay__fill"
-                  style={{ width: `${Math.round(Math.min(100, cleanProgress * 100))}%` }}
+                  style={{ width: `${Math.round(Math.min(100, interactionProgress * 100))}%` }}
                 />
               </div>
             </div>
-            {dustSpots.map((spot, index) => (
-              <div
-                key={`dust-${index}`}
-                className="clean-dust"
-                style={{
-                  left: spot.left,
-                  top: spot.top,
-                  opacity: Math.max(0, dustAlpha - index * 0.08)
-                }}
-              />
-            ))}
+            {cleanMode
+              ? dustSpots.map((spot, index) => (
+                <div
+                  key={`dust-${index}`}
+                  className="clean-dust"
+                  style={{
+                    left: spot.left,
+                    top: spot.top,
+                    opacity: Math.max(0, dustAlpha - index * 0.08)
+                  }}
+                />
+              ))
+              : (
+                <div className="feed-target-ring" aria-hidden="true" />
+              )}
             <div
               className={`clean-tool${toolPosition.visible ? ' is-visible' : ''}`}
               style={{
@@ -310,7 +350,7 @@ export default function PetScene({
               }}
               aria-hidden="true"
             >
-              S
+              {cleanMode ? 'S' : 'O'}
             </div>
           </>
         ) : null}

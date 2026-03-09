@@ -63,8 +63,8 @@ export default function KidPlayScreen({
   onUnlockPet
 }) {
   const [now, setNow] = useState(() => Date.now());
-  const [cleanMode, setCleanMode] = useState(false);
-  const [cleanProgress, setCleanProgress] = useState(0);
+  const [interactionMode, setInteractionMode] = useState('');
+  const [interactionProgress, setInteractionProgress] = useState(0);
 
   useEffect(() => {
     const timerId = window.setInterval(() => {
@@ -74,8 +74,8 @@ export default function KidPlayScreen({
   }, []);
 
   useEffect(() => {
-    setCleanMode(false);
-    setCleanProgress(0);
+    setInteractionMode('');
+    setInteractionProgress(0);
   }, [pet?.id]);
 
   if (!pet) {
@@ -101,13 +101,13 @@ export default function KidPlayScreen({
           themeId="soft3d"
           reaction={lastReaction}
           compact={false}
-          cleanMode={cleanMode}
-          cleanProgress={cleanProgress}
-          onCleanProgress={setCleanProgress}
-          onCleanComplete={async () => {
-            setCleanMode(false);
-            setCleanProgress(0);
-            await onKidAction('clean');
+          interactionMode={interactionMode}
+          interactionProgress={interactionProgress}
+          onInteractionProgress={setInteractionProgress}
+          onInteractionComplete={async (mode) => {
+            setInteractionMode('');
+            setInteractionProgress(0);
+            await onKidAction(mode);
           }}
         />
 
@@ -135,47 +135,58 @@ export default function KidPlayScreen({
       </Card>
 
       <Card className="kid-actions-card">
-        {cleanMode ? (
+        {interactionMode === 'clean' ? (
           <p className="kid-mode-hint">Drag the sponge over Buddy until the bar is full.</p>
+        ) : null}
+        {interactionMode === 'feed' ? (
+          <p className="kid-mode-hint">Drag food to Buddy's mouth 3 times.</p>
         ) : null}
         <div className="kid-actions-grid">
           <ActionButton
             icon="F"
-            label="Feed"
-            disabled={saving || !canEdit || cleanMode}
-            onClick={() => onKidAction('feed')}
+            label={interactionMode === 'feed' ? 'Drop food!' : 'Feed'}
+            disabled={saving || !canEdit || (interactionMode === 'clean')}
+            onClick={() => {
+              if (interactionMode === 'feed') {
+                setInteractionMode('');
+                setInteractionProgress(0);
+                return;
+              }
+              setInteractionMode('feed');
+              setInteractionProgress(0);
+            }}
           />
           <ActionButton
             icon="P"
             label="Play"
-            disabled={saving || !canEdit || cleanMode}
+            disabled={saving || !canEdit || Boolean(interactionMode)}
             onClick={() => onKidAction('play')}
           />
           <ActionButton
             icon="C"
-            label={cleanMode ? 'Scrub!' : 'Clean'}
+            label={interactionMode === 'clean' ? 'Scrub!' : 'Clean'}
             disabled={saving || !canEdit}
             onClick={() => {
-              if (cleanMode) {
-                setCleanMode(false);
-                setCleanProgress(0);
+              if (interactionMode === 'clean') {
+                setInteractionMode('');
+                setInteractionProgress(0);
                 return;
               }
-              setCleanMode(true);
-              setCleanProgress(0);
+              setInteractionMode('clean');
+              setInteractionProgress(0);
             }}
           />
           <ActionButton
             icon="Z"
             label="Sleep"
-            disabled={saving || !canEdit || cleanMode}
+            disabled={saving || !canEdit || Boolean(interactionMode)}
             onClick={() => onKidAction('sleep')}
           />
           {showMedicine ? (
             <ActionButton
               icon="M"
               label="Medicine"
-              disabled={saving || !canEdit || cleanMode}
+              disabled={saving || !canEdit || Boolean(interactionMode)}
               onClick={() => onKidAction('medicine')}
             />
           ) : null}

@@ -537,6 +537,20 @@
   transition: opacity 160ms ease;
 }
 
+.feed-target-ring {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  top: 59%;
+  width: 120px;
+  height: 84px;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  border: 2px dashed rgba(39, 94, 181, 0.45);
+  background: rgba(110, 167, 255, 0.08);
+  animation: feedPulse 900ms ease-in-out infinite;
+}
+
 .clean-tool {
   position: absolute;
   z-index: 6;
@@ -967,6 +981,12 @@
   0% { transform: scale(0.96); }
   40% { transform: scale(1.04); }
   100% { transform: scale(1); }
+}
+
+@keyframes feedPulse {
+  0% { transform: translate(-50%, -50%) scale(0.96); }
+  50% { transform: translate(-50%, -50%) scale(1.04); }
+  100% { transform: translate(-50%, -50%) scale(0.96); }
 }
 
 @media (min-width: 720px) {
