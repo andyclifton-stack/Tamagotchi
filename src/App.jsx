@@ -9,7 +9,7 @@ import PinPrompt from './components/PinPrompt';
 import { useAppBoot } from './hooks/useAppBoot';
 import { usePetList } from './hooks/usePetList';
 import { usePetSession } from './hooks/usePetSession';
-import { getLastPetId, setLastPetId } from './lib/storage';
+import { getCachedPetSnapshot, getLastPetId, setLastPetId } from './lib/storage';
 import {
   getParentAccess,
   lockParentGate,
@@ -21,7 +21,11 @@ import {
   mapKidActionToEngineActions,
   shouldShowMedicine
 } from './lib/kidPlay';
-import { buildStarterPetInput, shouldAutoCreateStarter } from './lib/starterPet';
+import {
+  buildStarterPetInput,
+  hasReusablePetSnapshot,
+  shouldAutoCreateStarter
+} from './lib/starterPet';
 import { buildAppShareUrl, openWhatsAppShare, shareUrl } from './lib/share';
 import { playSound, unlockAudio } from './lib/audio';
 
@@ -111,15 +115,18 @@ function OwnerApp() {
     if (!shouldCreate) return;
 
     starterCreatingRef.current = true;
-    session
-      .createPetSession(buildStarterPetInput())
+    const cachedPet = getCachedPetSnapshot();
+    const starterPromise = hasReusablePetSnapshot(cachedPet)
+      ? session.createPetFromSnapshot(cachedPet)
+      : session.createPetSession(buildStarterPetInput());
+    starterPromise
       .then((pet) => {
         starterCreatingRef.current = false;
         starterDoneRef.current = true;
         starterRetryCountRef.current = 0;
         setSelectedPetId(pet.id);
         setLastPetId(pet.id);
-        setNotice('Your buddy is ready!');
+        setNotice(hasReusablePetSnapshot(cachedPet) ? 'Welcome back!' : 'Your buddy is ready!');
       })
       .catch((error) => {
         starterCreatingRef.current = false;

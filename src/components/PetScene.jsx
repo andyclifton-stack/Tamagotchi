@@ -11,6 +11,16 @@ import {
   isPlayTargetHit
 } from '../lib/cleanInteraction';
 
+const TOOL_ICONS = {
+  clean: '\uD83E\uDDFD',
+  feed: '\uD83C\uDF4E',
+  play: '\uD83E\uDEB6',
+  sleep: '\uD83C\uDF19',
+  wake: '\u2600\uFE0F',
+  medicine: '\uD83D\uDC8A',
+  sparkle: '\u2728'
+};
+
 function expressionForMood(mood) {
   if (mood === 'sleeping') return 'sleep';
   if (mood === 'sparkly') return 'happy';
@@ -27,6 +37,14 @@ function stageScale(stage) {
     teen: 1,
     adult: 1.08
   }[stage] || 1;
+}
+
+function getSceneTimePeriod(timestamp) {
+  const hour = new Date(timestamp).getHours();
+  if (hour >= 5 && hour < 8) return 'dawn';
+  if (hour >= 8 && hour < 17) return 'day';
+  if (hour >= 17 && hour < 20) return 'dusk';
+  return 'night';
 }
 
 function drawRetroPet(canvas, pet, species) {
@@ -53,102 +71,300 @@ function drawRetroPet(canvas, pet, species) {
     paint(1, 2, 6, 4, colors.primary);
     paint(2, 5, 1, 1, colors.accent);
     paint(5, 4, 1, 1, colors.accent);
-  } else {
-    if (species.render.body === 'round') {
-      paint(1, 2, 6, 4, colors.primary);
-      paint(2, 1, 4, 6, colors.primary);
-    }
-    if (species.render.body === 'seed') {
-      paint(2, 1, 4, 6, colors.primary);
-      paint(1, 3, 6, 2, colors.primary);
-    }
-    if (species.render.body === 'bolt') {
-      paint(2, 1, 3, 6, colors.primary);
-      paint(4, 2, 2, 2, colors.primary);
-      paint(1, 4, 3, 2, colors.primary);
-    }
-    if (species.render.body === 'oval') {
-      paint(2, 1, 4, 6, colors.primary);
-      paint(1, 2, 6, 4, colors.primary);
-    }
-    paint(2, 1, 1, 1, colors.secondary);
-    paint(5, 1, 1, 1, colors.secondary);
-    paint(2, 3, 1, 1, colors.outline);
-    paint(5, 3, 1, 1, colors.outline);
-
-    const expression = expressionForMood(pet.currentMood);
-    if (expression === 'sad' || expression === 'ill') {
-      paint(3, 5, 2, 1, colors.outline);
-    } else {
-      paint(3, 5, 2, 1, colors.accent);
-    }
+    return;
   }
+
+  if (species.render.body === 'round') {
+    paint(1, 2, 6, 4, colors.primary);
+    paint(2, 1, 4, 6, colors.primary);
+  }
+  if (species.render.body === 'seed') {
+    paint(2, 1, 4, 6, colors.primary);
+    paint(1, 3, 6, 2, colors.primary);
+  }
+  if (species.render.body === 'bolt') {
+    paint(2, 1, 3, 6, colors.primary);
+    paint(4, 2, 2, 2, colors.primary);
+    paint(1, 4, 3, 2, colors.primary);
+  }
+  if (species.render.body === 'oval') {
+    paint(2, 1, 4, 6, colors.primary);
+    paint(1, 2, 6, 4, colors.primary);
+  }
+  paint(2, 1, 1, 1, colors.secondary);
+  paint(5, 1, 1, 1, colors.secondary);
+  paint(2, 3, 1, 1, colors.outline);
+  paint(5, 3, 1, 1, colors.outline);
+
+  const expression = expressionForMood(pet.currentMood);
+  if (expression === 'sad' || expression === 'ill') {
+    paint(3, 5, 2, 1, colors.outline);
+  } else {
+    paint(3, 5, 2, 1, colors.accent);
+  }
+}
+
+function getEarPath(ears) {
+  if (ears === 'leaf') {
+    return 'M70 94c8-34 20-54 42-66 4 32-4 54-22 72M150 94c-8-34-20-54-42-66-4 32 4 54 22 72';
+  }
+  if (ears === 'spike') {
+    return 'M72 98l18-54 26 50M148 98l-18-54-26 50';
+  }
+  if (ears === 'stub') {
+    return 'M78 96c6-20 18-32 34-34M142 96c-6-20-18-32-34-34';
+  }
+  return 'M74 98c10-28 26-44 42-52M146 98c-10-28-26-44-42-52';
 }
 
 function SvgPet({ pet, species }) {
   const expression = expressionForMood(pet.currentMood);
   const scale = stageScale(pet.currentStage);
-  const cheekOpacity = species.render.cheeks ? 1 : 0;
+  const cheekOpacity = species.render.cheeks ? 0.75 : 0;
   const branchGlow = pet.evolutionBranch === 'bright' ? 1 : 0.35;
   const isEgg = pet.currentStage === 'egg';
+  const gradientKey = `${species.id}-${pet.id || 'pet'}`;
+  const bodyWidth =
+    species.render.body === 'bolt' ? 60 : species.render.body === 'seed' ? 58 : 64;
+  const bellyWidth = species.render.body === 'bolt' ? 48 : 54;
+  const outlineColor = species.colors.outline;
 
   return (
     <svg viewBox="0 0 220 220" className="pet-svg" style={{ '--pet-scale': scale }}>
       <defs>
-        <radialGradient id={`pet-main-${species.id}`} cx="30%" cy="30%">
-          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.65" />
-          <stop offset="100%" stopColor={species.colors.primary} />
+        <radialGradient id={`pet-main-${gradientKey}`} cx="32%" cy="28%">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.82" />
+          <stop offset="65%" stopColor={species.colors.primary} />
+          <stop offset="100%" stopColor={species.colors.secondary} stopOpacity="0.92" />
+        </radialGradient>
+        <linearGradient id={`pet-rim-${gradientKey}`} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.9" />
+          <stop offset="100%" stopColor={species.colors.secondary} stopOpacity="0.74" />
+        </linearGradient>
+        <radialGradient id={`pet-belly-${gradientKey}`} cx="50%" cy="24%">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.86" />
+          <stop offset="100%" stopColor={species.colors.secondary} stopOpacity="0.36" />
+        </radialGradient>
+        <radialGradient id={`pet-aura-${gradientKey}`} cx="50%" cy="50%">
+          <stop offset="0%" stopColor={species.colors.accent} stopOpacity="0.34" />
+          <stop offset="100%" stopColor={species.colors.accent} stopOpacity="0" />
         </radialGradient>
       </defs>
       {isEgg ? (
-        <>
-          <ellipse cx="110" cy="120" rx="62" ry="76" fill={species.colors.primary} />
-          <path d="M84 92l14 14-18 20 16 10-12 16" stroke={species.colors.secondary} strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-          <path d="M140 86l-14 18 18 16-14 18" stroke={species.colors.accent} strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-        </>
+        <g className="pet-character pet-character--egg">
+          <ellipse
+            className="pet-character__aura"
+            cx="110"
+            cy="126"
+            rx="78"
+            ry="84"
+            fill={`url(#pet-aura-${gradientKey})`}
+          />
+          <ellipse cx="110" cy="126" rx="64" ry="80" fill={`url(#pet-main-${gradientKey})`} />
+          <ellipse
+            cx="110"
+            cy="138"
+            rx="56"
+            ry="64"
+            fill={`url(#pet-belly-${gradientKey})`}
+            opacity="0.64"
+          />
+          <ellipse cx="92" cy="88" rx="22" ry="12" fill="#ffffff" opacity="0.48" />
+          <path
+            d="M84 92l14 14-18 20 16 10-12 16"
+            stroke={species.colors.secondary}
+            strokeWidth="8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
+          <path
+            d="M140 86l-14 18 18 16-14 18"
+            stroke={species.colors.accent}
+            strokeWidth="8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
+          <ellipse cx="110" cy="192" rx="44" ry="10" fill={outlineColor} opacity="0.12" />
+        </g>
       ) : (
-        <>
-          <g transform={`translate(110 110) scale(${scale}) translate(-110 -110)`}>
-            <ellipse cx="110" cy="122" rx={species.render.body === 'bolt' ? 56 : 62} ry="58" fill={`url(#pet-main-${species.id})`} />
-            <ellipse cx="110" cy="136" rx="56" ry="34" fill={species.colors.secondary} opacity="0.25" />
+        <g
+          transform={`translate(110 112) scale(${scale}) translate(-110 -112)`}
+          className={`pet-character pet-character--${expression}`}
+        >
+          <ellipse
+            className="pet-character__aura"
+            cx="110"
+            cy="126"
+            rx="82"
+            ry="72"
+            fill={`url(#pet-aura-${gradientKey})`}
+          />
+          <g className="pet-character__ears">
             <path
-              d={
-                species.render.ears === 'leaf'
-                  ? 'M76 72c8-20 20-34 30-38-2 22-10 34-22 44M144 72c-8-20-20-34-30-38 2 22 10 34 22 44'
-                  : species.render.ears === 'spike'
-                    ? 'M72 76l18-36 18 34M148 76l-18-36-18 34'
-                    : species.render.ears === 'stub'
-                      ? 'M78 78c4-16 12-24 22-28M142 78c-4-16-12-24-22-28'
-                      : 'M80 76c6-18 16-28 24-32M140 76c-6-18-16-28-24-32'
-              }
-              stroke={species.colors.secondary}
-              strokeWidth="10"
+              d={getEarPath(species.render.ears)}
+              stroke={`url(#pet-rim-${gradientKey})`}
+              strokeWidth="14"
               strokeLinecap="round"
               strokeLinejoin="round"
               fill="none"
             />
-            <ellipse cx="88" cy="110" rx="8" ry={expression === 'sleep' ? 2 : 9} fill={species.colors.outline} />
-            <ellipse cx="132" cy="110" rx="8" ry={expression === 'sleep' ? 2 : 9} fill={species.colors.outline} />
-            <ellipse cx="84" cy="132" rx="10" ry="6" fill={species.colors.accent} opacity={cheekOpacity} />
-            <ellipse cx="136" cy="132" rx="10" ry="6" fill={species.colors.accent} opacity={cheekOpacity} />
             <path
-              d={
-                expression === 'sad' || expression === 'ill'
-                  ? 'M90 150c10-8 30-8 40 0'
-                  : expression === 'happy'
-                    ? 'M86 142c10 18 38 18 48 0'
-                    : 'M92 144c8 6 28 6 36 0'
-              }
-              stroke={species.colors.outline}
+              d={getEarPath(species.render.ears)}
+              stroke={species.colors.secondary}
               strokeWidth="8"
               strokeLinecap="round"
+              strokeLinejoin="round"
               fill="none"
             />
-            {pet.evolutionBranch ? (
-              <circle cx="164" cy="78" r="14" fill={species.colors.accent} opacity={branchGlow} />
-            ) : null}
           </g>
-        </>
+          <ellipse
+            className="pet-character__foot pet-character__foot--left"
+            cx="84"
+            cy="170"
+            rx="18"
+            ry="12"
+            fill={species.colors.secondary}
+            opacity="0.8"
+          />
+          <ellipse
+            className="pet-character__foot pet-character__foot--right"
+            cx="136"
+            cy="170"
+            rx="18"
+            ry="12"
+            fill={species.colors.secondary}
+            opacity="0.8"
+          />
+          <ellipse
+            className="pet-character__shell"
+            cx="110"
+            cy="124"
+            rx={bodyWidth}
+            ry="60"
+            fill={`url(#pet-main-${gradientKey})`}
+          />
+          <ellipse
+            className="pet-character__rim"
+            cx="110"
+            cy="120"
+            rx={bodyWidth - 6}
+            ry="50"
+            fill={`url(#pet-rim-${gradientKey})`}
+            opacity="0.26"
+          />
+          <ellipse
+            className="pet-character__belly"
+            cx="110"
+            cy="140"
+            rx={bellyWidth}
+            ry="36"
+            fill={`url(#pet-belly-${gradientKey})`}
+          />
+          <ellipse
+            className="pet-character__shine"
+            cx="88"
+            cy="94"
+            rx="24"
+            ry="14"
+            fill="#ffffff"
+            opacity="0.46"
+          />
+          <ellipse
+            className="pet-character__shine pet-character__shine--small"
+            cx="144"
+            cy="118"
+            rx="10"
+            ry="7"
+            fill="#ffffff"
+            opacity="0.18"
+          />
+          {expression === 'sleep' ? (
+            <g className="pet-character__face">
+              <path
+                className="pet-character__eye-sleep"
+                d="M78 112c8-8 18-8 26 0"
+                stroke={outlineColor}
+                strokeWidth="7"
+                strokeLinecap="round"
+                fill="none"
+              />
+              <path
+                className="pet-character__eye-sleep"
+                d="M116 112c8-8 18-8 26 0"
+                stroke={outlineColor}
+                strokeWidth="7"
+                strokeLinecap="round"
+                fill="none"
+              />
+            </g>
+          ) : (
+            <g className="pet-character__face">
+              <g className="pet-character__eye-group">
+                <ellipse
+                  className="pet-character__eye"
+                  cx="88"
+                  cy="112"
+                  rx="11"
+                  ry={expression === 'ill' ? 6 : 12}
+                  fill={outlineColor}
+                />
+                <ellipse
+                  className="pet-character__eye"
+                  cx="132"
+                  cy="112"
+                  rx="11"
+                  ry={expression === 'ill' ? 6 : 12}
+                  fill={outlineColor}
+                />
+                <ellipse
+                  className="pet-character__eye-shine"
+                  cx="84"
+                  cy="106"
+                  rx="3"
+                  ry="4"
+                  fill="#ffffff"
+                  opacity="0.9"
+                />
+                <ellipse
+                  className="pet-character__eye-shine"
+                  cx="128"
+                  cy="106"
+                  rx="3"
+                  ry="4"
+                  fill="#ffffff"
+                  opacity="0.9"
+                />
+              </g>
+            </g>
+          )}
+          <ellipse cx="82" cy="134" rx="12" ry="8" fill={species.colors.accent} opacity={cheekOpacity} />
+          <ellipse cx="138" cy="134" rx="12" ry="8" fill={species.colors.accent} opacity={cheekOpacity} />
+          <path
+            className="pet-character__mouth"
+            d={
+              expression === 'sad' || expression === 'ill'
+                ? 'M92 150c10-8 26-8 36 0'
+                : expression === 'happy'
+                  ? 'M88 144c10 16 34 16 44 0'
+                  : 'M94 146c8 6 24 6 32 0'
+            }
+            stroke={outlineColor}
+            strokeWidth="8"
+            strokeLinecap="round"
+            fill="none"
+          />
+          <circle className="pet-character__nose" cx="110" cy="136" r="4" fill={outlineColor} opacity="0.4" />
+          {pet.evolutionBranch ? (
+            <g className="pet-character__orbit" opacity={branchGlow}>
+              <circle cx="164" cy="82" r="9" fill={species.colors.accent} />
+              <circle cx="174" cy="70" r="4" fill="#ffffff" opacity="0.7" />
+              <circle cx="154" cy="68" r="3" fill="#ffffff" opacity="0.56" />
+            </g>
+          ) : null}
+          <ellipse cx="110" cy="194" rx="46" ry="10" fill={outlineColor} opacity="0.1" />
+        </g>
       )}
     </svg>
   );
@@ -161,6 +377,7 @@ export default function PetScene({
   compact = false,
   interactive = false,
   showMedicineTool = false,
+  clockNow = Date.now(),
   onInteractionComplete
 }) {
   const canvasRef = useRef(null);
@@ -184,6 +401,7 @@ export default function PetScene({
   const stats = pet.stats || { ...pet.statsPreview, messCount: 0 };
   const status = pet.status || pet.statusPreview || {};
   const sleepingNow = Boolean(status?.isSleeping || status?.lightsOff);
+  const roomPeriod = sleepingNow ? 'night' : getSceneTimePeriod(clockNow);
   const cleanMode = activeMode === 'clean';
   const feedMode = activeMode === 'feed';
   const playMode = activeMode === 'play';
@@ -215,26 +433,18 @@ export default function PetScene({
 
   const moodClass = useMemo(() => {
     if (status?.careCenterRest) return 'is-resting';
-    if (status?.isSleeping) return 'is-sleeping';
+    if (sleepingNow) return 'is-sleeping';
     if (status?.isSick) return 'is-sick';
     if (stats.messCount > 0) return 'is-messy';
     return 'is-content';
-  }, [stats.messCount, status]);
+  }, [sleepingNow, stats.messCount, status]);
 
   const finishInteraction = (mode, relX = 0.5, relY = 0.6) => {
-    const iconMap = {
-      clean: '🧽',
-      feed: '🍎',
-      play: '🎉',
-      sleep: '🌙',
-      wake: '☀️',
-      medicine: '💚'
-    };
     const burst = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       x: relX,
       y: relY,
-      icon: iconMap[mode] || '✨'
+      icon: TOOL_ICONS[mode] || TOOL_ICONS.sparkle
     };
     setBursts((current) => [...current, burst]);
     const timer = window.setTimeout(() => {
@@ -366,14 +576,22 @@ export default function PetScene({
     <div className={`pet-scene ${theme.roomClass} ${moodClass}${compact ? ' is-compact' : ''}`}>
       <div
         ref={roomRef}
-        className={`pet-scene__room pet-scene__room--${sleepingNow ? 'night' : (pet.timeOfDay || 'day')}${activeMode ? ' is-clean-mode' : ''}`}
+        className={`pet-scene__room pet-scene__room--${roomPeriod}${activeMode ? ' is-clean-mode' : ''}`}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
       >
         <div className="pet-scene__sun" />
+        <div className="pet-scene__stars" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+          <span />
+          <span />
+        </div>
         <div className="pet-scene__window" />
+        <div className="pet-scene__window-glow" />
         <div className="pet-scene__floor" />
         <div className="pet-scene__shadow" />
         <div className={`pet-avatar pet-avatar--${reaction}`}>
@@ -383,7 +601,7 @@ export default function PetScene({
             <SvgPet pet={pet} species={species} />
           )}
         </div>
-        {status?.isSleeping ? <div className="scene-badge">Sleep</div> : null}
+        {sleepingNow ? <div className="scene-badge">Sleep</div> : null}
         {status?.isSick ? <div className="scene-badge scene-badge--ill">Sick</div> : null}
         {stats.messCount > 0 ? <div className="scene-badge scene-badge--mess">Mess x{stats.messCount}</div> : null}
         {status?.careCenterRest ? <div className="scene-overlay-copy">Care Center Rest</div> : null}
@@ -392,7 +610,19 @@ export default function PetScene({
           <>
             <div className="clean-overlay">
               <div className="clean-overlay__head">
-                <span>{cleanMode ? 'Scrub to clean' : feedMode ? 'Drag food to mouth' : playMode ? 'Tickle Buddy' : medicineMode ? 'Give medicine' : sleepMode ? 'Pull down to sleep' : 'Wake up'}</span>
+                <span>
+                  {cleanMode
+                    ? 'Scrub to clean'
+                    : feedMode
+                      ? 'Drag food to mouth'
+                      : playMode
+                        ? 'Tickle Buddy'
+                        : medicineMode
+                          ? 'Give medicine'
+                          : sleepMode
+                            ? 'Pull down to sleep'
+                            : 'Wake up'}
+                </span>
                 <strong>{Math.round(interactionProgress * 100)}%</strong>
               </div>
               <div className="clean-overlay__track">
@@ -431,7 +661,17 @@ export default function PetScene({
               }}
               aria-hidden="true"
             >
-              {cleanMode ? '🧽' : feedMode ? '🍎' : playMode ? '🪶' : medicineMode ? '💊' : sleepMode ? '🌙' : '☀️'}
+              {cleanMode
+                ? TOOL_ICONS.clean
+                : feedMode
+                  ? TOOL_ICONS.feed
+                  : playMode
+                    ? TOOL_ICONS.play
+                    : medicineMode
+                      ? TOOL_ICONS.medicine
+                      : sleepMode
+                        ? TOOL_ICONS.sleep
+                        : TOOL_ICONS.wake}
             </div>
 
             {sleepMode ? (
@@ -446,18 +686,27 @@ export default function PetScene({
 
         {interactive && !compact ? (
           <div className="tool-bar">
-            <button type="button" className="tool-source tool-source--feed" data-tool="feed">🍎</button>
-            <button type="button" className="tool-source tool-source--play" data-tool="play">🪶</button>
-            <button type="button" className="tool-source tool-source--clean" data-tool="clean">🧽</button>
+            <button type="button" className="tool-source tool-source--feed" data-tool="feed" aria-label="Feed">
+              {TOOL_ICONS.feed}
+            </button>
+            <button type="button" className="tool-source tool-source--play" data-tool="play" aria-label="Play">
+              {TOOL_ICONS.play}
+            </button>
+            <button type="button" className="tool-source tool-source--clean" data-tool="clean" aria-label="Clean">
+              {TOOL_ICONS.clean}
+            </button>
             <button
               type="button"
               className="tool-source tool-source--sleep"
               data-tool={sleepingNow ? 'wake' : 'sleep'}
+              aria-label={sleepingNow ? 'Wake up' : 'Sleep'}
             >
-              {sleepingNow ? '☀️' : '🌙'}
+              {sleepingNow ? TOOL_ICONS.wake : TOOL_ICONS.sleep}
             </button>
             {showMedicineTool ? (
-              <button type="button" className="tool-source tool-source--medicine" data-tool="medicine">💊</button>
+              <button type="button" className="tool-source tool-source--medicine" data-tool="medicine" aria-label="Medicine">
+                {TOOL_ICONS.medicine}
+              </button>
             ) : null}
           </div>
         ) : null}

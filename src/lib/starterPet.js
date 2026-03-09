@@ -8,6 +8,16 @@ export function buildStarterPetInput() {
   };
 }
 
+export function hasReusablePetSnapshot(snapshot) {
+  return Boolean(
+    snapshot?.name &&
+    snapshot?.speciesId &&
+    Number.isFinite(snapshot?.createdAt) &&
+    snapshot?.stats &&
+    snapshot?.status
+  );
+}
+
 export function shouldAutoCreateStarter({
   booting,
   ownerUid,

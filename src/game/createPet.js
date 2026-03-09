@@ -78,3 +78,20 @@ export async function createPet(input, ownerUid, now = Date.now()) {
     version: SAVE_VERSION
   };
 }
+
+export function createPetFromSnapshot(snapshot, ownerUid, now = Date.now()) {
+  const nextPet = JSON.parse(JSON.stringify(snapshot));
+  nextPet.id = crypto.randomUUID();
+  nextPet.ownerUid = ownerUid;
+  nextPet.updatedAt = now;
+  nextPet.lastPlayedAt = now;
+  nextPet.lastSimulatedAt = snapshot.lastSimulatedAt || now;
+  nextPet.share = {
+    shareToken: null,
+    shareEnabled: false,
+    sharedAt: null
+  };
+  nextPet.archived = false;
+  nextPet.version = SAVE_VERSION;
+  return nextPet;
+}

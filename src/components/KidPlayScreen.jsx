@@ -4,9 +4,19 @@ import PetScene from './PetScene';
 import { formatStage } from '../lib/format';
 import { HATCH_MS } from '../data/evolutionRules';
 
-function toTitleCase(value) {
-  if (!value) return 'Day';
-  return value.charAt(0).toUpperCase() + value.slice(1);
+function getCurrentTimePeriod(timestamp) {
+  const hour = new Date(timestamp).getHours();
+  if (hour >= 5 && hour < 8) return 'Dawn';
+  if (hour >= 8 && hour < 17) return 'Day';
+  if (hour >= 17 && hour < 20) return 'Dusk';
+  return 'Night';
+}
+
+function formatClock(timestamp) {
+  return new Intl.DateTimeFormat('en-GB', {
+    hour: 'numeric',
+    minute: '2-digit'
+  }).format(timestamp);
 }
 
 function getEggCountdown(pet, now) {
@@ -51,7 +61,7 @@ export default function KidPlayScreen({
   useEffect(() => {
     const timerId = window.setInterval(() => {
       setNow(Date.now());
-    }, 30000);
+    }, 15000);
     return () => window.clearInterval(timerId);
   }, []);
 
@@ -63,6 +73,12 @@ export default function KidPlayScreen({
     );
   }
 
+  const timeLabel = pet.status?.isSleeping || pet.status?.lightsOff
+    ? 'Night'
+    : getCurrentTimePeriod(now);
+  const clockLabel = formatClock(now);
+  const eggCountdown = pet.currentStage === 'egg' ? getEggCountdown(pet, now) : '';
+
   return (
     <div className="kid-layout">
       <Card className="kid-pet-card">
@@ -70,7 +86,7 @@ export default function KidPlayScreen({
           <p className="eyebrow">{formatStage(pet.currentStage)}</p>
           <h2>{pet.name}</h2>
           <p className="kid-pet-card__meta">
-            {toTitleCase(pet.timeOfDay)} {pet.currentStage === 'egg' ? `- ${getEggCountdown(pet, now)}` : ''}
+            {timeLabel} - {clockLabel}{eggCountdown ? ` - ${eggCountdown}` : ''}
           </p>
         </div>
         <PetScene
@@ -80,6 +96,7 @@ export default function KidPlayScreen({
           compact={false}
           interactive={canEdit && !saving}
           showMedicineTool={showMedicine}
+          clockNow={now}
           onInteractionComplete={async (mode) => {
             await onKidAction(mode);
           }}

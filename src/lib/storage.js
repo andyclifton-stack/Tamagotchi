@@ -9,6 +9,7 @@ const UNLOCKS_KEY = 'tamagotchi_unlocks_v1';
 const LAST_PET_KEY = 'tamagotchi_last_pet_v1';
 const PARENT_GATE_KEY = 'tamagotchi_parent_gate_v1';
 const PARENT_PIN_KEY = 'tamagotchi_parent_pin_v1';
+const PET_CACHE_KEY = 'tamagotchi_pet_cache_v1';
 
 function safeParse(raw, fallback) {
   try {
@@ -80,6 +81,19 @@ export function getLastPetId() {
   return localStorage.getItem(LAST_PET_KEY) || '';
 }
 
+export function getCachedPetSnapshot() {
+  return safeParse(localStorage.getItem(PET_CACHE_KEY), null);
+}
+
+export function saveCachedPetSnapshot(pet) {
+  if (!pet?.id) return;
+  localStorage.setItem(PET_CACHE_KEY, JSON.stringify(pet));
+}
+
+export function clearCachedPetSnapshot() {
+  localStorage.removeItem(PET_CACHE_KEY);
+}
+
 export function getParentGateState(now = Date.now()) {
   const current = safeParse(localStorage.getItem(PARENT_GATE_KEY), null);
   if (!current || !current.unlocked || current.expiresAt <= now) {
@@ -120,4 +134,6 @@ export function clearLocalAppData() {
   localStorage.removeItem(UNLOCKS_KEY);
   localStorage.removeItem(LAST_PET_KEY);
   localStorage.removeItem(PARENT_GATE_KEY);
+  localStorage.removeItem(PARENT_PIN_KEY);
+  localStorage.removeItem(PET_CACHE_KEY);
 }

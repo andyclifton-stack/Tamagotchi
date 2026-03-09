@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildStarterPetInput, shouldAutoCreateStarter } from '../starterPet';
+import {
+  buildStarterPetInput,
+  hasReusablePetSnapshot,
+  shouldAutoCreateStarter
+} from '../starterPet';
 
 describe('starter pet helpers', () => {
   it('returns the expected starter pet payload', () => {
@@ -50,6 +54,28 @@ describe('starter pet helpers', () => {
         petListLoading: false,
         petCount: 0,
         starterCreated: true
+      })
+    ).toBe(false);
+  });
+
+  it('accepts only complete cached pet snapshots for restore', () => {
+    expect(
+      hasReusablePetSnapshot({
+        name: 'Buddy',
+        speciesId: 'mochi',
+        createdAt: Date.parse('2026-03-09T19:00:00Z'),
+        stats: { hunger: 60 },
+        status: { isSleeping: false }
+      })
+    ).toBe(true);
+
+    expect(
+      hasReusablePetSnapshot({
+        name: 'Buddy',
+        speciesId: 'mochi',
+        createdAt: 'bad',
+        stats: { hunger: 60 },
+        status: { isSleeping: false }
       })
     ).toBe(false);
   });

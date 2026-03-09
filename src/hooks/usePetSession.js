@@ -1,9 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPetRecord, deletePet, ensurePublicShare, loadPet, savePetSimulation } from '../services/petRepository';
-import { createPet } from '../game/createPet';
+import { createPet, createPetFromSnapshot } from '../game/createPet';
 import { applyPetAction } from '../game/actions';
 import { simulatePetState } from '../game/simulation';
-import { clearUnlockState, getUnlockState, setLastPetId, setUnlockState } from '../lib/storage';
+import {
+  clearCachedPetSnapshot,
+  clearUnlockState,
+  getUnlockState,
+  saveCachedPetSnapshot,
+  setLastPetId,
+  setUnlockState
+} from '../lib/storage';
 import { isMasterPin, verifyPin } from '../lib/pin';
 
 const SAVE_TICK_MS = 60 * 1000;
@@ -41,6 +48,7 @@ export function usePetSession({ petId, ownerUid }) {
         }
         const simulated = simulatePetState(record, Date.now());
         setPet(simulated.pet);
+        saveCachedPetSnapshot(simulated.pet);
         setLastEvents(simulated.events);
         setError('');
         setLoading(false);
@@ -70,6 +78,7 @@ export function usePetSession({ petId, ownerUid }) {
       const simulated = simulatePetState(pet, Date.now());
       setPet(simulated.pet);
       setLastEvents(simulated.events);
+      saveCachedPetSnapshot(simulated.pet);
       try {
         await savePetSimulation(simulated);
       } catch (saveError) {
@@ -88,6 +97,7 @@ export function usePetSession({ petId, ownerUid }) {
       const newPet = await createPet(input, ownerUid, Date.now());
       await createPetRecord(newPet);
       setPet(newPet);
+      saveCachedPetSnapshot(newPet);
       setLastPetId(newPet.id);
       return newPet;
     } catch (createError) {
@@ -104,6 +114,7 @@ export function usePetSession({ petId, ownerUid }) {
     try {
       const result = applyPetAction(pet, action, Date.now());
       setPet(result.pet);
+      saveCachedPetSnapshot(result.pet);
       setLastEvents(result.events);
       setLastReaction(result.reaction);
       await savePetSimulation(result);
@@ -132,6 +143,7 @@ export function usePetSession({ petId, ownerUid }) {
       };
       await savePetSimulation(result);
       setPet(nextPet);
+      saveCachedPetSnapshot(nextPet);
       return nextPet;
     } catch (saveError) {
       setError(saveError.message || 'Could not save that change.');
@@ -185,6 +197,7 @@ export function usePetSession({ petId, ownerUid }) {
       const refreshedPet = await loadPet(pet.id);
       if (refreshedPet) {
         setPet(refreshedPet);
+        saveCachedPetSnapshot(refreshedPet);
       }
       return share;
     } catch (shareError) {
@@ -197,6 +210,7 @@ export function usePetSession({ petId, ownerUid }) {
     if (!pet?.id) return;
     try {
       await deletePet(pet.id);
+      clearCachedPetSnapshot();
       setPet(null);
     } catch (deleteError) {
       setError(deleteError.message || 'Could not delete the pet.');
@@ -222,7 +236,23 @@ export function usePetSession({ petId, ownerUid }) {
       removePet,
       savePetEdit,
       setPet,
-      setError
+      setError,
+      createPetFromSnapshot: async (snapshot) => {
+        setSaving(true);
+        try {
+          const recreatedPet = createPetFromSnapshot(snapshot, ownerUid, Date.now());
+          await createPetRecord(recreatedPet);
+          setPet(recreatedPet);
+          saveCachedPetSnapshot(recreatedPet);
+          setLastPetId(recreatedPet.id);
+          return recreatedPet;
+        } catch (createError) {
+          setError(createError.message || 'Could not restore the pet.');
+          throw createError;
+        } finally {
+          setSaving(false);
+        }
+      }
     }),
     [
       pet,
