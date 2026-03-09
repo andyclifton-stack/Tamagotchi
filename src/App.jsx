@@ -53,6 +53,7 @@ function OwnerApp() {
   const [hasParentPin, setHasParentPin] = useState(false);
   const [petPinPromptOpen, setPetPinPromptOpen] = useState(false);
   const [petPinError, setPetPinError] = useState('');
+  const [blockedPetIds, setBlockedPetIds] = useState([]);
   const [starterRetryTick, setStarterRetryTick] = useState(0);
 
   const noticeTimerRef = useRef(0);
@@ -67,39 +68,44 @@ function OwnerApp() {
     ownerUid: boot.user?.uid || ''
   });
 
+  const visiblePets = useMemo(
+    () => petList.pets.filter((pet) => !blockedPetIds.includes(pet.id)),
+    [blockedPetIds, petList.pets]
+  );
+
   const activePet =
-    petList.pets.find((pet) => pet.id === selectedPetId) || petList.pets[0] || null;
+    visiblePets.find((pet) => pet.id === selectedPetId) || visiblePets[0] || null;
 
   useEffect(() => {
-    if (!selectedPetId && petList.pets.length) {
-      const restored = petList.pets.find((pet) => pet.id === getLastPetId());
-      setSelectedPetId(restored ? restored.id : petList.pets[0].id);
+    if (!selectedPetId && visiblePets.length) {
+      const restored = visiblePets.find((pet) => pet.id === getLastPetId());
+      setSelectedPetId(restored ? restored.id : visiblePets[0].id);
     }
-  }, [petList.pets, selectedPetId]);
+  }, [selectedPetId, visiblePets]);
 
   useEffect(() => {
-    if (selectedPetId && petList.pets.length) {
-      const exists = petList.pets.some((pet) => pet.id === selectedPetId);
+    if (selectedPetId && visiblePets.length) {
+      const exists = visiblePets.some((pet) => pet.id === selectedPetId);
       if (!exists) {
-        setSelectedPetId(petList.pets[0].id);
+        setSelectedPetId(visiblePets[0].id);
       }
     }
-  }, [petList.pets, selectedPetId]);
+  }, [selectedPetId, visiblePets]);
 
   useEffect(() => {
-    if (petList.pets.length) {
+    if (visiblePets.length) {
       starterDoneRef.current = true;
       starterCreatingRef.current = false;
       starterRetryCountRef.current = 0;
     }
-  }, [petList.pets.length]);
+  }, [visiblePets.length]);
 
   useEffect(() => {
     const shouldCreate = shouldAutoCreateStarter({
       booting: boot.booting,
       ownerUid: boot.user?.uid,
       petListLoading: petList.loading,
-      petCount: petList.pets.length,
+      petCount: visiblePets.length,
       starterCreated: starterDoneRef.current || starterCreatingRef.current
     });
     if (!shouldCreate) return;
@@ -129,15 +135,24 @@ function OwnerApp() {
     boot.booting,
     boot.user?.uid,
     petList.loading,
-    petList.pets.length,
-    starterRetryTick
+    starterRetryTick,
+    visiblePets.length
   ]);
 
   useEffect(() => {
-    if (session.error) {
-      setNotice(session.error);
+    if (!session.error) return;
+
+    if (/PERMISSION_DENIED/i.test(session.error) && selectedPetId) {
+      setBlockedPetIds((current) =>
+        current.includes(selectedPetId) ? current : [...current, selectedPetId]
+      );
+      setSelectedPetId('');
+      setNotice('One saved pet could not be opened. Trying another pet.');
+      return;
     }
-  }, [session.error]);
+
+    setNotice(session.error);
+  }, [selectedPetId, session.error]);
 
   useEffect(() => {
     if (!boot.settings.soundEnabled) return;
@@ -357,7 +372,7 @@ function OwnerApp() {
 
       <ParentPanel
         open={parentPanelOpen}
-        pets={petList.pets}
+        pets={visiblePets}
         selectedPetId={selectedPetId}
         settings={boot.settings}
         onClose={() => setParentPanelOpen(false)}
