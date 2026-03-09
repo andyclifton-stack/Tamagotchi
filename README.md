@@ -101,3 +101,4 @@ The public share view uses query params to avoid GitHub Pages route issues:
 
 `https://fingergame.co.uk/Tamagotchi/?view=public&share=TOKEN`
 
+
