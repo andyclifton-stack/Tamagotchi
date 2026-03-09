@@ -22,6 +22,8 @@ npm run dev
 
 The local dev server runs on `http://localhost:5175/`.
 
+
+Important: this app's Firebase API key is currently restricted to approved web referrers. That means the app can hang during Firebase boot on `localhost` until `localhost` and `127.0.0.1` are added to the API key's allowed referrers in Google Cloud Console, or until you test from the live Pages URL instead.
 ## Build and test
 
 ```bash
