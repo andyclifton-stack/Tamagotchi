@@ -697,6 +697,12 @@
   font-size: clamp(1.9rem, 8vw, 2.8rem);
 }
 
+.kid-pet-card__meta {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: var(--muted);
+}
+
 .kid-needs-grid {
   display: grid;
   gap: 10px;
@@ -758,6 +764,11 @@
   place-items: center;
   gap: 6px;
   padding: 10px 8px;
+  transition: transform 110ms ease, box-shadow 110ms ease;
+}
+
+.kid-action:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .kid-action:disabled {

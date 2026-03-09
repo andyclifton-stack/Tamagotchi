@@ -46,7 +46,16 @@ export function applyPetAction(petRecord, action, now = Date.now()) {
 
   if (
     pet.currentStage === 'egg' &&
-    ![ACTION_TYPES.COMFORT, ACTION_TYPES.CHECK_STATUS, ACTION_TYPES.TOGGLE_LIGHTS].includes(action.type)
+    ![
+      ACTION_TYPES.COMFORT,
+      ACTION_TYPES.CHECK_STATUS,
+      ACTION_TYPES.TOGGLE_LIGHTS,
+      ACTION_TYPES.FEED_MEAL,
+      ACTION_TYPES.CLEAN_WASH,
+      ACTION_TYPES.TOILET,
+      ACTION_TYPES.REST,
+      ACTION_TYPES.GIVE_MEDICINE
+    ].includes(action.type)
   ) {
     addEvent(events, now, 'blocked', 'The egg is not ready for that action yet.');
     return finalise(pet, now, events, 'tap');

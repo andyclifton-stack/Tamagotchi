@@ -192,6 +192,14 @@ function OwnerApp() {
   const handleKidAction = async (actionId) => {
     const actions = mapKidActionToEngineActions(actionId, session.pet);
     if (!actions.length) return;
+    const actionFeedback = {
+      feed: 'Yum!',
+      play: 'Yay!',
+      clean: 'Sparkly clean!',
+      sleep: 'Sleep time.',
+      medicine: 'Feel better soon.'
+    };
+    showNotice(actionFeedback[actionId] || 'Nice!');
     try {
       for (const action of actions) {
         await session.performAction(action);

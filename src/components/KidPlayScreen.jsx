@@ -1,6 +1,23 @@
+import { useEffect, useState } from 'react';
 import Card from './ui/Card';
 import PetScene from './PetScene';
 import { formatStage } from '../lib/format';
+import { HATCH_MS } from '../data/evolutionRules';
+
+function toTitleCase(value) {
+  if (!value) return 'Day';
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function getEggCountdown(pet, now) {
+  const sinceCreated = Math.max(0, now - (pet.createdAt || now));
+  const remaining = Math.max(0, HATCH_MS - sinceCreated);
+  const minutes = Math.ceil(remaining / 60000);
+  if (minutes <= 0) {
+    return 'Hatching now';
+  }
+  return `Hatches in ${minutes} min`;
+}
 
 function NeedBar({ label, value, tone }) {
   return (
@@ -45,6 +62,15 @@ export default function KidPlayScreen({
   onKidAction,
   onUnlockPet
 }) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timerId = window.setInterval(() => {
+      setNow(Date.now());
+    }, 30000);
+    return () => window.clearInterval(timerId);
+  }, []);
+
   if (!pet) {
     return (
       <Card className="empty-card">
@@ -59,6 +85,9 @@ export default function KidPlayScreen({
         <div className="kid-pet-card__head">
           <p className="eyebrow">{formatStage(pet.currentStage)}</p>
           <h2>{pet.name}</h2>
+          <p className="kid-pet-card__meta">
+            {toTitleCase(pet.timeOfDay)} {pet.currentStage === 'egg' ? `• ${getEggCountdown(pet, now)}` : ''}
+          </p>
         </div>
         <PetScene
           pet={pet}
