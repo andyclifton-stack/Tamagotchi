@@ -130,6 +130,11 @@ export function applyPetAction(petRecord, action, now = Date.now()) {
       pet.status.lightsOff = action.payload?.lightsOff ?? !pet.status.lightsOff;
       if (pet.status.lightsOff && (pet.stats.energy < 45 || pet.currentStage !== 'egg')) {
         pet.status.asleepUntil = getNextWakeTime(pet, now);
+        pet.status.isSleeping = true;
+      } else if (!pet.status.lightsOff) {
+        pet.status.asleepUntil = null;
+        pet.status.isSleeping = false;
+        applyDelta(pet.stats, 'happiness', 3);
       }
       addEvent(
         events,

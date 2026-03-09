@@ -197,6 +197,7 @@ function OwnerApp() {
       play: 'Yay!',
       clean: 'Sparkly clean!',
       sleep: 'Sleep time.',
+      wake: 'Good morning!',
       medicine: 'Feel better soon.'
     };
     showNotice(actionFeedback[actionId] || 'Nice!');

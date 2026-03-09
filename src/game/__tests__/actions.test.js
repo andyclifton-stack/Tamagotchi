@@ -89,3 +89,28 @@ describe('applyPetAction egg handling', () => {
     expect(result.events.some((event) => event.type === 'blocked')).toBe(false);
   });
 });
+
+describe('applyPetAction lights toggle', () => {
+  it('wakes pet when lights are turned back on', () => {
+    const now = Date.parse('2026-03-09T22:30:00Z');
+    const pet = makePet({
+      currentStage: 'child',
+      hatchedAt: Date.parse('2026-03-09T10:15:00Z'),
+      status: {
+        lightsOff: true,
+        isSleeping: true,
+        asleepUntil: Date.parse('2026-03-10T07:00:00Z')
+      }
+    });
+
+    const result = applyPetAction(
+      pet,
+      { type: ACTION_TYPES.TOGGLE_LIGHTS, payload: { lightsOff: false } },
+      now
+    );
+
+    expect(result.pet.status.lightsOff).toBe(false);
+    expect(result.pet.status.isSleeping).toBe(false);
+    expect(result.pet.status.asleepUntil).toBeNull();
+  });
+});

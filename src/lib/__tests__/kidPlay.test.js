@@ -61,6 +61,10 @@ describe('kid play helpers', () => {
       { type: ACTION_TYPES.TOGGLE_LIGHTS, payload: { lightsOff: true } },
       { type: ACTION_TYPES.REST }
     ]);
+
+    expect(mapKidActionToEngineActions('wake', makePet())).toEqual([
+      { type: ACTION_TYPES.TOGGLE_LIGHTS, payload: { lightsOff: false } }
+    ]);
   });
 
   it('derives kid-facing needs from existing stat model', () => {

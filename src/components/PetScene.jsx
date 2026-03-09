@@ -183,6 +183,7 @@ export default function PetScene({
   const theme = THEME_MAP[themeId] || THEME_MAP.soft3d;
   const stats = pet.stats || { ...pet.statsPreview, messCount: 0 };
   const status = pet.status || pet.statusPreview || {};
+  const sleepingNow = Boolean(status?.isSleeping || status?.lightsOff);
   const cleanMode = activeMode === 'clean';
   const feedMode = activeMode === 'feed';
   const playMode = activeMode === 'play';
@@ -226,6 +227,7 @@ export default function PetScene({
       feed: '🍎',
       play: '🎉',
       sleep: '🌙',
+      wake: '☀️',
       medicine: '💚'
     };
     const burst = {
@@ -335,6 +337,11 @@ export default function PetScene({
     const mode = source.getAttribute('data-tool') || '';
     if (!mode) return;
 
+    if (mode === 'wake') {
+      finishInteraction('wake', 0.5, 0.18);
+      return;
+    }
+
     if (activeModeRef.current !== mode) {
       resetModeState(mode);
     }
@@ -359,7 +366,7 @@ export default function PetScene({
     <div className={`pet-scene ${theme.roomClass} ${moodClass}${compact ? ' is-compact' : ''}`}>
       <div
         ref={roomRef}
-        className={`pet-scene__room pet-scene__room--${pet.timeOfDay || 'day'}${activeMode ? ' is-clean-mode' : ''}`}
+        className={`pet-scene__room pet-scene__room--${sleepingNow ? 'night' : (pet.timeOfDay || 'day')}${activeMode ? ' is-clean-mode' : ''}`}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -385,7 +392,7 @@ export default function PetScene({
           <>
             <div className="clean-overlay">
               <div className="clean-overlay__head">
-                <span>{cleanMode ? 'Scrub to clean' : feedMode ? 'Drag food to mouth' : playMode ? 'Tickle Buddy' : medicineMode ? 'Give medicine' : 'Pull down to sleep'}</span>
+                <span>{cleanMode ? 'Scrub to clean' : feedMode ? 'Drag food to mouth' : playMode ? 'Tickle Buddy' : medicineMode ? 'Give medicine' : sleepMode ? 'Pull down to sleep' : 'Wake up'}</span>
                 <strong>{Math.round(interactionProgress * 100)}%</strong>
               </div>
               <div className="clean-overlay__track">
@@ -424,7 +431,7 @@ export default function PetScene({
               }}
               aria-hidden="true"
             >
-              {cleanMode ? '🧽' : feedMode ? '🍎' : playMode ? '🪶' : medicineMode ? '💊' : '🌙'}
+              {cleanMode ? '🧽' : feedMode ? '🍎' : playMode ? '🪶' : medicineMode ? '💊' : sleepMode ? '🌙' : '☀️'}
             </div>
 
             {sleepMode ? (
@@ -442,7 +449,13 @@ export default function PetScene({
             <button type="button" className="tool-source tool-source--feed" data-tool="feed">🍎</button>
             <button type="button" className="tool-source tool-source--play" data-tool="play">🪶</button>
             <button type="button" className="tool-source tool-source--clean" data-tool="clean">🧽</button>
-            <button type="button" className="tool-source tool-source--sleep" data-tool="sleep">🌙</button>
+            <button
+              type="button"
+              className="tool-source tool-source--sleep"
+              data-tool={sleepingNow ? 'wake' : 'sleep'}
+            >
+              {sleepingNow ? '☀️' : '🌙'}
+            </button>
             {showMedicineTool ? (
               <button type="button" className="tool-source tool-source--medicine" data-tool="medicine">💊</button>
             ) : null}

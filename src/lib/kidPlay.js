@@ -50,6 +50,14 @@ export function mapKidActionToEngineActions(actionId, pet) {
       { type: ACTION_TYPES.REST }
     ];
   }
+  if (actionId === 'wake') {
+    return [
+      {
+        type: ACTION_TYPES.TOGGLE_LIGHTS,
+        payload: { lightsOff: false }
+      }
+    ];
+  }
   if (actionId === 'medicine') {
     return [{ type: ACTION_TYPES.GIVE_MEDICINE }];
   }
