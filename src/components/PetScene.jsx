@@ -1,0 +1,190 @@
+import { useEffect, useMemo, useRef } from 'react';
+import { PET_TYPE_MAP } from '../data/petTypes';
+import { THEME_MAP } from '../data/themes';
+
+function expressionForMood(mood) {
+  if (mood === 'sleeping') return 'sleep';
+  if (mood === 'sparkly') return 'happy';
+  if (mood === 'hungry' || mood === 'grumpy' || mood === 'care-center') return 'sad';
+  if (mood === 'sick') return 'ill';
+  return 'neutral';
+}
+
+function stageScale(stage) {
+  return {
+    egg: 0.62,
+    baby: 0.78,
+    child: 0.92,
+    teen: 1,
+    adult: 1.08
+  }[stage] || 1;
+}
+
+function drawRetroPet(canvas, pet, species) {
+  if (!canvas || !pet || !species) return;
+  const ctx = canvas.getContext('2d');
+  const width = canvas.width;
+  const height = canvas.height;
+  ctx.clearRect(0, 0, width, height);
+  ctx.imageSmoothingEnabled = false;
+
+  const scale = stageScale(pet.currentStage);
+  const px = Math.round(5 * scale);
+  const originX = Math.round(width / 2 - 4 * px);
+  const originY = Math.round(height / 2 - 4 * px);
+
+  const paint = (x, y, w, h, color) => {
+    ctx.fillStyle = color;
+    ctx.fillRect(originX + x * px, originY + y * px, w * px, h * px);
+  };
+
+  const colors = species.colors;
+  if (pet.currentStage === 'egg') {
+    paint(2, 1, 4, 6, colors.secondary);
+    paint(1, 2, 6, 4, colors.primary);
+    paint(2, 5, 1, 1, colors.accent);
+    paint(5, 4, 1, 1, colors.accent);
+  } else {
+    if (species.render.body === 'round') {
+      paint(1, 2, 6, 4, colors.primary);
+      paint(2, 1, 4, 6, colors.primary);
+    }
+    if (species.render.body === 'seed') {
+      paint(2, 1, 4, 6, colors.primary);
+      paint(1, 3, 6, 2, colors.primary);
+    }
+    if (species.render.body === 'bolt') {
+      paint(2, 1, 3, 6, colors.primary);
+      paint(4, 2, 2, 2, colors.primary);
+      paint(1, 4, 3, 2, colors.primary);
+    }
+    if (species.render.body === 'oval') {
+      paint(2, 1, 4, 6, colors.primary);
+      paint(1, 2, 6, 4, colors.primary);
+    }
+    paint(2, 1, 1, 1, colors.secondary);
+    paint(5, 1, 1, 1, colors.secondary);
+    paint(2, 3, 1, 1, colors.outline);
+    paint(5, 3, 1, 1, colors.outline);
+
+    const expression = expressionForMood(pet.currentMood);
+    if (expression === 'sad' || expression === 'ill') {
+      paint(3, 5, 2, 1, colors.outline);
+    } else {
+      paint(3, 5, 2, 1, colors.accent);
+    }
+  }
+}
+
+function SvgPet({ pet, species }) {
+  const expression = expressionForMood(pet.currentMood);
+  const scale = stageScale(pet.currentStage);
+  const cheekOpacity = species.render.cheeks ? 1 : 0;
+  const branchGlow = pet.evolutionBranch === 'bright' ? 1 : 0.35;
+  const isEgg = pet.currentStage === 'egg';
+
+  return (
+    <svg viewBox="0 0 220 220" className="pet-svg" style={{ '--pet-scale': scale }}>
+      <defs>
+        <radialGradient id={`pet-main-${species.id}`} cx="30%" cy="30%">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.65" />
+          <stop offset="100%" stopColor={species.colors.primary} />
+        </radialGradient>
+      </defs>
+      {isEgg ? (
+        <>
+          <ellipse cx="110" cy="120" rx="62" ry="76" fill={species.colors.primary} />
+          <path d="M84 92l14 14-18 20 16 10-12 16" stroke={species.colors.secondary} strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+          <path d="M140 86l-14 18 18 16-14 18" stroke={species.colors.accent} strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        </>
+      ) : (
+        <>
+          <g transform={`translate(110 110) scale(${scale}) translate(-110 -110)`}>
+            <ellipse cx="110" cy="122" rx={species.render.body === 'bolt' ? 56 : 62} ry="58" fill={`url(#pet-main-${species.id})`} />
+            <ellipse cx="110" cy="136" rx="56" ry="34" fill={species.colors.secondary} opacity="0.25" />
+            <path
+              d={
+                species.render.ears === 'leaf'
+                  ? 'M76 72c8-20 20-34 30-38-2 22-10 34-22 44M144 72c-8-20-20-34-30-38 2 22 10 34 22 44'
+                  : species.render.ears === 'spike'
+                    ? 'M72 76l18-36 18 34M148 76l-18-36-18 34'
+                    : species.render.ears === 'stub'
+                      ? 'M78 78c4-16 12-24 22-28M142 78c-4-16-12-24-22-28'
+                      : 'M80 76c6-18 16-28 24-32M140 76c-6-18-16-28-24-32'
+              }
+              stroke={species.colors.secondary}
+              strokeWidth="10"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
+            />
+            <ellipse cx="88" cy="110" rx="8" ry={expression === 'sleep' ? 2 : 9} fill={species.colors.outline} />
+            <ellipse cx="132" cy="110" rx="8" ry={expression === 'sleep' ? 2 : 9} fill={species.colors.outline} />
+            <ellipse cx="84" cy="132" rx="10" ry="6" fill={species.colors.accent} opacity={cheekOpacity} />
+            <ellipse cx="136" cy="132" rx="10" ry="6" fill={species.colors.accent} opacity={cheekOpacity} />
+            <path
+              d={
+                expression === 'sad' || expression === 'ill'
+                  ? 'M90 150c10-8 30-8 40 0'
+                  : expression === 'happy'
+                    ? 'M86 142c10 18 38 18 48 0'
+                    : 'M92 144c8 6 28 6 36 0'
+              }
+              stroke={species.colors.outline}
+              strokeWidth="8"
+              strokeLinecap="round"
+              fill="none"
+            />
+            {pet.evolutionBranch ? (
+              <circle cx="164" cy="78" r="14" fill={species.colors.accent} opacity={branchGlow} />
+            ) : null}
+          </g>
+        </>
+      )}
+    </svg>
+  );
+}
+
+export default function PetScene({ pet, themeId, reaction = 'tap', compact = false }) {
+  const canvasRef = useRef(null);
+  const species = PET_TYPE_MAP[pet.speciesId];
+  const theme = THEME_MAP[themeId] || THEME_MAP.soft3d;
+  const stats = pet.stats || { ...pet.statsPreview, messCount: 0 };
+  const status = pet.status || pet.statusPreview || {};
+
+  useEffect(() => {
+    if (theme.family === 'retro') {
+      drawRetroPet(canvasRef.current, pet, species);
+    }
+  }, [theme.family, pet, species]);
+
+  const moodClass = useMemo(() => {
+    if (status?.careCenterRest) return 'is-resting';
+    if (status?.isSleeping) return 'is-sleeping';
+    if (status?.isSick) return 'is-sick';
+    if (stats.messCount > 0) return 'is-messy';
+    return 'is-content';
+  }, [stats.messCount, status]);
+
+  return (
+    <div className={`pet-scene ${theme.roomClass} ${moodClass}${compact ? ' is-compact' : ''}`}>
+      <div className={`pet-scene__room pet-scene__room--${pet.timeOfDay || 'day'}`}>
+        <div className="pet-scene__sun" />
+        <div className="pet-scene__window" />
+        <div className="pet-scene__floor" />
+        <div className="pet-scene__shadow" />
+        <div className={`pet-avatar pet-avatar--${reaction}`}>
+          {theme.family === 'retro' ? (
+            <canvas ref={canvasRef} className="pet-retro-canvas" width="200" height="180" />
+          ) : (
+            <SvgPet pet={pet} species={species} />
+          )}
+        </div>
+        {status?.isSleeping ? <div className="scene-badge">Sleep</div> : null}
+        {status?.isSick ? <div className="scene-badge scene-badge--ill">Sick</div> : null}
+        {stats.messCount > 0 ? <div className="scene-badge scene-badge--mess">Mess x{stats.messCount}</div> : null}
+        {status?.careCenterRest ? <div className="scene-overlay-copy">Care Center Rest</div> : null}
+      </div>
+    </div>
+  );
+}

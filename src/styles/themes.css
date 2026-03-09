@@ -1,0 +1,84 @@
+.theme-soft3d.pet-scene__room,
+.theme-soft3d .pet-scene__room {
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.5), transparent 28%),
+    linear-gradient(180deg, #ffd0c6 0%, #ffdfe9 42%, #ffeede 100%);
+}
+
+.theme-cute.pet-scene__room,
+.theme-cute .pet-scene__room {
+  background:
+    radial-gradient(circle at 22% 18%, rgba(255, 255, 255, 0.7), transparent 24%),
+    linear-gradient(180deg, #d8ffee 0%, #f7ecff 56%, #ffe4d6 100%);
+}
+
+.theme-retro.pet-scene__room,
+.theme-retro .pet-scene__room {
+  background:
+    linear-gradient(180deg, #2c3556 0%, #5668aa 40%, #f7d67e 41%, #d5a845 100%);
+}
+
+.theme-retro .pet-scene__window,
+.theme-retro.pet-scene__room .pet-scene__window {
+  border-radius: 12px;
+  border-width: 3px;
+}
+
+.theme-retro .pet-scene__floor,
+.theme-retro.pet-scene__room .pet-scene__floor {
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(38, 27, 13, 0.18) 0 14px,
+    rgba(38, 27, 13, 0.1) 14px 28px
+  );
+}
+
+.pet-scene__room--day .pet-scene__sun {
+  opacity: 1;
+}
+
+.pet-scene__room--dawn .pet-scene__sun {
+  opacity: 0.7;
+  background: rgba(255, 250, 220, 0.8);
+}
+
+.pet-scene__room--dusk .pet-scene__sun {
+  opacity: 0.75;
+  background: rgba(255, 222, 173, 0.82);
+}
+
+.pet-scene__room--night {
+  filter: saturate(0.92) brightness(0.86);
+}
+
+.pet-scene__room--night .pet-scene__window {
+  background: rgba(33, 47, 88, 0.26);
+}
+
+.pet-scene__room--night .pet-scene__sun {
+  background: rgba(214, 226, 255, 0.78);
+}
+
+.pet-scene.is-sick .pet-avatar {
+  filter: saturate(0.88);
+}
+
+.pet-scene.is-sleeping .pet-avatar {
+  transform: translateY(4px);
+}
+
+.pet-scene.is-messy .pet-scene__floor::after {
+  content: '';
+  position: absolute;
+  width: 70px;
+  height: 20px;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: rgba(84, 56, 31, 0.25);
+}
+
+.pet-scene.is-resting .pet-avatar {
+  opacity: 0.72;
+}
