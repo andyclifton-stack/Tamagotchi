@@ -139,7 +139,7 @@ export default function KidPlayScreen({
           <p className="kid-mode-hint">Drag the sponge over Buddy until the bar is full.</p>
         ) : null}
         {interactionMode === 'feed' ? (
-          <p className="kid-mode-hint">Drag food to Buddy's mouth 3 times.</p>
+          <p className="kid-mode-hint">Drag the apple onto Buddy's mouth 3 times.</p>
         ) : null}
         <div className="kid-actions-grid">
           <ActionButton

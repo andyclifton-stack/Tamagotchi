@@ -551,6 +551,27 @@
   animation: feedPulse 900ms ease-in-out infinite;
 }
 
+.feed-item-source {
+  position: absolute;
+  z-index: 6;
+  left: 16px;
+  bottom: 14px;
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(35, 75, 142, 0.2);
+  box-shadow: 0 10px 20px rgba(25, 43, 74, 0.2);
+  animation: feedSourceBob 1.4s ease-in-out infinite;
+}
+
+.feed-item-source span {
+  font-size: 2rem;
+  line-height: 1;
+}
+
 .clean-tool {
   position: absolute;
   z-index: 6;
@@ -987,6 +1008,12 @@
   0% { transform: translate(-50%, -50%) scale(0.96); }
   50% { transform: translate(-50%, -50%) scale(1.04); }
   100% { transform: translate(-50%, -50%) scale(0.96); }
+}
+
+@keyframes feedSourceBob {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+  100% { transform: translateY(0); }
 }
 
 @media (min-width: 720px) {

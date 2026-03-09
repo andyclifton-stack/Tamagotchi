@@ -272,6 +272,10 @@ export default function PetScene({
 
   const handlePointerDown = (event) => {
     if (!cleanMode && !feedMode) return;
+    if (feedMode) {
+      const fromSource = Boolean(event.target.closest?.('.feed-item-source'));
+      if (!fromSource) return;
+    }
     pointerActiveRef.current = true;
     event.currentTarget.setPointerCapture?.(event.pointerId);
     handleInteractionPoint(event.clientX, event.clientY);
@@ -340,7 +344,12 @@ export default function PetScene({
                 />
               ))
               : (
-                <div className="feed-target-ring" aria-hidden="true" />
+                <>
+                  <div className="feed-target-ring" aria-hidden="true" />
+                  <div className="feed-item-source" aria-hidden="true">
+                    <span>🍎</span>
+                  </div>
+                </>
               )}
             <div
               className={`clean-tool${toolPosition.visible ? ' is-visible' : ''}`}
@@ -350,7 +359,7 @@ export default function PetScene({
               }}
               aria-hidden="true"
             >
-              {cleanMode ? 'S' : 'O'}
+              {cleanMode ? 'S' : '🍎'}
             </div>
           </>
         ) : null}
