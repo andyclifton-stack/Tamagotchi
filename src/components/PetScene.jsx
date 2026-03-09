@@ -173,10 +173,12 @@ export default function PetScene({
   const sleepProgressRef = useRef(0);
   const completeFiredRef = useRef(false);
   const burstTimersRef = useRef([]);
+
   const [toolPosition, setToolPosition] = useState({ x: 0.5, y: 0.72, visible: false });
   const [activeMode, setActiveMode] = useState('');
   const [interactionProgress, setInteractionProgress] = useState(0);
   const [bursts, setBursts] = useState([]);
+
   const species = PET_TYPE_MAP[pet.speciesId];
   const theme = THEME_MAP[themeId] || THEME_MAP.soft3d;
   const stats = pet.stats || { ...pet.statsPreview, messCount: 0 };
@@ -220,7 +222,7 @@ export default function PetScene({
 
   const finishInteraction = (mode, relX = 0.5, relY = 0.6) => {
     const iconMap = {
-      clean: '✨',
+      clean: '🧽',
       feed: '🍎',
       play: '🎉',
       sleep: '🌙',
@@ -244,6 +246,7 @@ export default function PetScene({
     setActiveMode('');
     setInteractionProgress(0);
     setToolPosition((current) => ({ ...current, visible: false }));
+
     if (typeof onInteractionComplete === 'function') {
       onInteractionComplete(mode);
     }
@@ -269,17 +272,14 @@ export default function PetScene({
     const y = Math.min(rect.height, Math.max(0, clientY - rect.top));
     const relX = x / rect.width;
     const relY = y / rect.height;
-
     setToolPosition({ x: relX, y: relY, visible: true });
 
     if (mode === 'clean') {
       const key = getCoverageCell(relX, relY);
       if (visitedCellsRef.current.has(key)) return;
       visitedCellsRef.current.add(key);
-
       const progress = getCoverageProgress(visitedCellsRef.current.size);
       setInteractionProgress(progress);
-
       if (progress >= scrubGoal && !completeFiredRef.current) {
         completeFiredRef.current = true;
         finishInteraction('clean', relX, relY);
@@ -308,7 +308,6 @@ export default function PetScene({
       const key = getPlayTargetCell(relX, relY);
       if (visitedCellsRef.current.has(key)) return;
       visitedCellsRef.current.add(key);
-
       const progress = getCoverageProgress(visitedCellsRef.current.size, 6, 6);
       setInteractionProgress(progress);
       if (progress >= 0.58 && !completeFiredRef.current) {
@@ -319,10 +318,7 @@ export default function PetScene({
     }
 
     if (mode === 'sleep') {
-      const next = Math.max(
-        sleepProgressRef.current,
-        getSleepPullProgress(relY)
-      );
+      const next = Math.max(sleepProgressRef.current, getSleepPullProgress(relY));
       sleepProgressRef.current = next;
       setInteractionProgress(next);
       if (next >= 0.98 && !completeFiredRef.current) {
@@ -339,7 +335,9 @@ export default function PetScene({
     const mode = source.getAttribute('data-tool') || '';
     if (!mode) return;
 
-    resetModeState(mode);
+    if (activeModeRef.current !== mode) {
+      resetModeState(mode);
+    }
     pointerActiveRef.current = true;
     event.currentTarget.setPointerCapture?.(event.pointerId);
     handleInteractionPoint(mode, event.clientX, event.clientY);
@@ -382,6 +380,7 @@ export default function PetScene({
         {status?.isSick ? <div className="scene-badge scene-badge--ill">Sick</div> : null}
         {stats.messCount > 0 ? <div className="scene-badge scene-badge--mess">Mess x{stats.messCount}</div> : null}
         {status?.careCenterRest ? <div className="scene-overlay-copy">Care Center Rest</div> : null}
+
         {activeMode ? (
           <>
             <div className="clean-overlay">
@@ -396,6 +395,7 @@ export default function PetScene({
                 />
               </div>
             </div>
+
             {cleanMode
               ? dustSpots.map((spot, index) => (
                 <div
@@ -415,6 +415,7 @@ export default function PetScene({
                   {sleepMode ? <div className="sleep-target-band" aria-hidden="true" /> : null}
                 </>
               )}
+
             <div
               className={`clean-tool${toolPosition.visible ? ' is-visible' : ''}`}
               style={{
@@ -423,8 +424,9 @@ export default function PetScene({
               }}
               aria-hidden="true"
             >
-              {cleanMode ? 'S' : feedMode ? '🍎' : playMode ? '🪶' : medicineMode ? '💊' : '🌙'}
+              {cleanMode ? '🧽' : feedMode ? '🍎' : playMode ? '🪶' : medicineMode ? '💊' : '🌙'}
             </div>
+
             {sleepMode ? (
               <div
                 className="sleep-curtain"
@@ -437,22 +439,12 @@ export default function PetScene({
 
         {interactive && !compact ? (
           <div className="tool-bar">
-            <button type="button" className="tool-source tool-source--feed" data-tool="feed">
-              🍎
-            </button>
-            <button type="button" className="tool-source tool-source--play" data-tool="play">
-              🪶
-            </button>
-            <button type="button" className="tool-source tool-source--clean" data-tool="clean">
-              S
-            </button>
-            <button type="button" className="tool-source tool-source--sleep" data-tool="sleep">
-              🌙
-            </button>
+            <button type="button" className="tool-source tool-source--feed" data-tool="feed">🍎</button>
+            <button type="button" className="tool-source tool-source--play" data-tool="play">🪶</button>
+            <button type="button" className="tool-source tool-source--clean" data-tool="clean">🧽</button>
+            <button type="button" className="tool-source tool-source--sleep" data-tool="sleep">🌙</button>
             {showMedicineTool ? (
-              <button type="button" className="tool-source tool-source--medicine" data-tool="medicine">
-                💊
-              </button>
+              <button type="button" className="tool-source tool-source--medicine" data-tool="medicine">💊</button>
             ) : null}
           </div>
         ) : null}
