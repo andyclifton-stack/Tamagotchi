@@ -17,6 +17,7 @@ export default function ParentPanel({
   onSetPetPin,
   onAssignProfile,
   onDeletePet,
+  onDeleteOldPets,
   onShareApp,
   onSharePet,
   onSettingsChange,
@@ -245,6 +246,14 @@ export default function ParentPanel({
                   onClick={handleRename}
                 >
                   Rename
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={working || pets.length < 2}
+                  onClick={onDeleteOldPets}
+                >
+                  Delete Old Pets
                 </Button>
                 <Button type="button" variant="secondary" onClick={() => onSharePet('native')}>
                   Share Pet

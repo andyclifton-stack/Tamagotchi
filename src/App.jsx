@@ -44,7 +44,11 @@ import {
 } from './lib/profiles';
 import { buildAppShareUrl, openWhatsAppShare, shareUrl } from './lib/share';
 import { playSound, unlockAudio } from './lib/audio';
-import { loadPetAccessCodeRecord, loadPetAccessRecord } from './services/petRepository';
+import {
+  deletePet as deletePetRecord,
+  loadPetAccessCodeRecord,
+  loadPetAccessRecord
+} from './services/petRepository';
 
 function parseViewMode() {
   const params = new URLSearchParams(window.location.search);
@@ -165,12 +169,21 @@ function OwnerApp() {
 
   useEffect(() => {
     if (!selectedPetId || !activeProfile || selectedPetSource !== 'profile') return;
+    if (screen === 'play' || session.loading || session.pet?.id === selectedPetId) return;
     const stillVisible = currentProfilePets.some((pet) => pet.id === selectedPetId);
     if (!stillVisible) {
       setSelectedPetId('');
       setScreen('profilePets');
     }
-  }, [activeProfile, currentProfilePets, selectedPetId, selectedPetSource]);
+  }, [
+    activeProfile,
+    currentProfilePets,
+    screen,
+    selectedPetId,
+    selectedPetSource,
+    session.loading,
+    session.pet?.id
+  ]);
 
   useEffect(() => {
     if (!session.error) return;
@@ -391,6 +404,47 @@ function OwnerApp() {
     } catch (error) {
       showNotice(error.message || 'Could not delete pet.');
     }
+  };
+
+  const handleDeleteOldPets = async () => {
+    if (!visiblePets.length) {
+      showNotice('No pets to clean up.');
+      return;
+    }
+
+    const sortedPets = [...visiblePets].sort((left, right) => (right.updatedAt || 0) - (left.updatedAt || 0));
+    const keepPetId = selectedPetId || sortedPets[0]?.id || '';
+    const oldPets = sortedPets.filter((pet) => pet.id !== keepPetId);
+
+    if (!oldPets.length) {
+      showNotice('Only one pet left. Nothing to delete.');
+      return;
+    }
+
+    const keepPetName = sortedPets.find((pet) => pet.id === keepPetId)?.name || 'the newest pet';
+    const previewNames = oldPets.slice(0, 6).map((pet) => pet.name).join(', ');
+    const overflow = oldPets.length > 6 ? ` +${oldPets.length - 6} more` : '';
+    const confirmed = window.confirm(
+      `Delete ${oldPets.length} old pets and keep ${keepPetName}?\n\n${previewNames}${overflow}`
+    );
+    if (!confirmed) return;
+
+    let deletedCount = 0;
+    for (const oldPet of oldPets) {
+      try {
+        await deletePetRecord(oldPet.id);
+        deletedCount += 1;
+      } catch (error) {
+        // Keep deleting the rest even if one delete fails.
+      }
+    }
+
+    if (deletedCount) {
+      showNotice(`Deleted ${deletedCount} old pet${deletedCount === 1 ? '' : 's'}.`);
+      return;
+    }
+
+    showNotice('Could not delete old pets.');
   };
 
   const handleAdminAction = async (kind) => {
@@ -706,6 +760,7 @@ function OwnerApp() {
         onSetPetPin={handleSetPetPin}
         onAssignProfile={handleAssignPetProfile}
         onDeletePet={handleDeletePet}
+        onDeleteOldPets={handleDeleteOldPets}
         onShareApp={handleAppShare}
         onSharePet={handlePetShare}
         onSettingsChange={boot.setSettings}
