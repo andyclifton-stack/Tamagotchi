@@ -29,6 +29,13 @@ export default function AppShell({
     }, 2000);
   };
 
+  const handleTouchStart = (event) => {
+    if (event.cancelable) {
+      event.preventDefault();
+    }
+    startHold();
+  };
+
   useEffect(() => () => clearHold(), []);
 
   return (
@@ -48,10 +55,13 @@ export default function AppShell({
         </div>
         <div
           className="app-shell__title-wrap"
-          onPointerDown={startHold}
-          onPointerUp={clearHold}
-          onPointerLeave={clearHold}
-          onPointerCancel={clearHold}
+          onMouseDown={startHold}
+          onMouseUp={clearHold}
+          onMouseLeave={clearHold}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={clearHold}
+          onTouchCancel={clearHold}
+          onContextMenu={(event) => event.preventDefault()}
         >
           <p className="eyebrow">{subtitle}</p>
           <h1>{title}</h1>
