@@ -196,6 +196,7 @@ function OwnerApp() {
       !petList.loading &&
       visiblePets.length === 0 &&
       hasReusablePetSnapshot(cachedPet) &&
+      cachedPet?.ownerUid === boot.user?.uid &&
       !restoreAttemptedRef.current;
 
     if (!shouldRestore) return;

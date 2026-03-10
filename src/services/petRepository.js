@@ -106,18 +106,21 @@ async function applyUpdates(updates, grant = null) {
   }
 
   const idToken = await getGrantIdToken(grant);
-  const url = new URL(`${firebaseConfig.databaseURL}/.json`);
-  url.searchParams.set('auth', idToken);
-  const response = await fetch(url.toString(), {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(updates)
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(payload?.error || 'Could not save the pet.');
+
+  for (const [path, value] of Object.entries(updates)) {
+    const url = new URL(`${firebaseConfig.databaseURL}/${path}.json`);
+    url.searchParams.set('auth', idToken);
+    const response = await fetch(url.toString(), {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(value)
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload?.error || 'Could not save the pet.');
+    }
   }
 }
 

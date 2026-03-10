@@ -94,7 +94,9 @@ export function usePetSession({ petId, ownerUid, accessGrant, parentPin }) {
         }
         const simulated = simulatePetState(record, Date.now());
         setPet(simulated.pet);
-        saveCachedPetSnapshot(simulated.pet);
+        if (record.ownerUid === ownerUid) {
+          saveCachedPetSnapshot(simulated.pet);
+        }
         setLastEvents(simulated.events);
         setError('');
         setLoading(false);
@@ -129,7 +131,9 @@ export function usePetSession({ petId, ownerUid, accessGrant, parentPin }) {
       const simulated = simulatePetState(pet, Date.now());
       setPet(simulated.pet);
       setLastEvents(simulated.events);
-      saveCachedPetSnapshot(simulated.pet);
+      if (simulated.pet.ownerUid === ownerUid) {
+        saveCachedPetSnapshot(simulated.pet);
+      }
       try {
         await savePetSimulation(simulated, buildSaveOptions(simulated.pet));
       } catch (saveError) {
@@ -179,7 +183,9 @@ export function usePetSession({ petId, ownerUid, accessGrant, parentPin }) {
     try {
       const result = applyPetAction(pet, action, Date.now());
       setPet(result.pet);
-      saveCachedPetSnapshot(result.pet);
+      if (result.pet.ownerUid === ownerUid) {
+        saveCachedPetSnapshot(result.pet);
+      }
       setLastEvents(result.events);
       setLastReaction(result.reaction);
       await savePetSimulation(result, buildSaveOptions(result.pet));
@@ -211,7 +217,9 @@ export function usePetSession({ petId, ownerUid, accessGrant, parentPin }) {
       }
       await savePetSimulation(result, buildSaveOptions(nextPet, secretOverrides));
       setPet(nextPet);
-      saveCachedPetSnapshot(nextPet);
+      if (nextPet.ownerUid === ownerUid) {
+        saveCachedPetSnapshot(nextPet);
+      }
       return nextPet;
     } catch (saveError) {
       setError(saveError.message || 'Could not save that change.');
@@ -269,7 +277,9 @@ export function usePetSession({ petId, ownerUid, accessGrant, parentPin }) {
       const refreshedPet = await loadPet(pet.id, getRemoteGrant(pet.id));
       if (refreshedPet) {
         setPet(refreshedPet);
-        saveCachedPetSnapshot(refreshedPet);
+        if (refreshedPet.ownerUid === ownerUid) {
+          saveCachedPetSnapshot(refreshedPet);
+        }
       }
       return share;
     } catch (shareError) {
@@ -304,7 +314,9 @@ export function usePetSession({ petId, ownerUid, accessGrant, parentPin }) {
 
     await savePetSimulation(result, buildSaveOptions(result.pet));
     setPet(result.pet);
-    saveCachedPetSnapshot(result.pet);
+    if (result.pet.ownerUid === ownerUid) {
+      saveCachedPetSnapshot(result.pet);
+    }
     return result.pet;
   };
 
