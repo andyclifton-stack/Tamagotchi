@@ -102,6 +102,21 @@ describe('simulatePetState', () => {
     expect(overnight.pet.stats.hunger).toBeGreaterThan(daytime.pet.stats.hunger);
   });
 
+  it('respects manual day mode even during the real night window', () => {
+    const pet = makePet({
+      currentStage: 'child',
+      hatchedAt: Date.parse('2026-03-09T10:15:00Z'),
+      lastSimulatedAt: Date.parse('2026-03-09T22:00:00Z'),
+      status: {
+        lightsOff: false,
+        asleepUntil: -1
+      }
+    });
+
+    const result = simulatePetState(pet, Date.parse('2026-03-09T23:00:00Z'));
+    expect(result.pet.status.isSleeping).toBe(false);
+  });
+
   it('prevents terminal state in live forever mode', () => {
     const pet = makePet({
       currentStage: 'adult',

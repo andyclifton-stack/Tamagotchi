@@ -91,6 +91,24 @@ describe('applyPetAction egg handling', () => {
 });
 
 describe('applyPetAction lights toggle', () => {
+  it('forces persistent night mode when lights are turned off', () => {
+    const now = Date.parse('2026-03-09T14:30:00Z');
+    const pet = makePet({
+      currentStage: 'child',
+      hatchedAt: Date.parse('2026-03-09T10:15:00Z')
+    });
+
+    const result = applyPetAction(
+      pet,
+      { type: ACTION_TYPES.TOGGLE_LIGHTS, payload: { lightsOff: true } },
+      now
+    );
+
+    expect(result.pet.status.lightsOff).toBe(true);
+    expect(result.pet.status.isSleeping).toBe(true);
+    expect(result.pet.status.asleepUntil).toBeNull();
+  });
+
   it('wakes pet when lights are turned back on', () => {
     const now = Date.parse('2026-03-09T22:30:00Z');
     const pet = makePet({
@@ -111,6 +129,6 @@ describe('applyPetAction lights toggle', () => {
 
     expect(result.pet.status.lightsOff).toBe(false);
     expect(result.pet.status.isSleeping).toBe(false);
-    expect(result.pet.status.asleepUntil).toBeNull();
+    expect(result.pet.status.asleepUntil).toBe(-1);
   });
 });

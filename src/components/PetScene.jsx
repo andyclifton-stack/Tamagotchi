@@ -401,7 +401,8 @@ export default function PetScene({
   const stats = pet.stats || { ...pet.statsPreview, messCount: 0 };
   const status = pet.status || pet.statusPreview || {};
   const sleepingNow = Boolean(status?.isSleeping || status?.lightsOff);
-  const roomPeriod = sleepingNow ? 'night' : getSceneTimePeriod(clockNow);
+  const manualDayMode = status?.asleepUntil === -1 && !status?.lightsOff;
+  const roomPeriod = sleepingNow ? 'night' : manualDayMode ? 'day' : getSceneTimePeriod(clockNow);
   const cleanMode = activeMode === 'clean';
   const feedMode = activeMode === 'feed';
   const playMode = activeMode === 'play';
@@ -547,8 +548,8 @@ export default function PetScene({
     const mode = source.getAttribute('data-tool') || '';
     if (!mode) return;
 
-    if (mode === 'wake') {
-      finishInteraction('wake', 0.5, 0.18);
+    if (mode === 'sleep' || mode === 'wake') {
+      finishInteraction(mode, 0.5, 0.18);
       return;
     }
 
@@ -582,6 +583,7 @@ export default function PetScene({
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
       >
+        <div className="pet-scene__aurora" />
         <div className="pet-scene__sun" />
         <div className="pet-scene__stars" aria-hidden="true">
           <span />
@@ -594,13 +596,27 @@ export default function PetScene({
         <div className="pet-scene__window-glow" />
         <div className="pet-scene__floor" />
         <div className="pet-scene__shadow" />
+        <div className={`pet-scene__magic${sleepingNow ? ' is-sleeping' : ''}`} aria-hidden="true">
+          <span />
+          <span />
+          <span />
+          <span />
+        </div>
         <div className={`pet-avatar pet-avatar--${reaction}`}>
+          <div className="pet-avatar__halo" aria-hidden="true" />
           {theme.family === 'retro' ? (
             <canvas ref={canvasRef} className="pet-retro-canvas" width="200" height="180" />
           ) : (
             <SvgPet pet={pet} species={species} />
           )}
         </div>
+        {sleepingNow ? (
+          <div className="pet-scene__sleepy" aria-hidden="true">
+            <span>Z</span>
+            <span>Z</span>
+            <span>Z</span>
+          </div>
+        ) : null}
         {sleepingNow ? <div className="scene-badge">Sleep</div> : null}
         {status?.isSick ? <div className="scene-badge scene-badge--ill">Sick</div> : null}
         {stats.messCount > 0 ? <div className="scene-badge scene-badge--mess">Mess x{stats.messCount}</div> : null}

@@ -58,8 +58,7 @@ describe('kid play helpers', () => {
     ]);
 
     expect(mapKidActionToEngineActions('sleep', makePet())).toEqual([
-      { type: ACTION_TYPES.TOGGLE_LIGHTS, payload: { lightsOff: true } },
-      { type: ACTION_TYPES.REST }
+      { type: ACTION_TYPES.TOGGLE_LIGHTS, payload: { lightsOff: true } }
     ]);
 
     expect(mapKidActionToEngineActions('wake', makePet())).toEqual([

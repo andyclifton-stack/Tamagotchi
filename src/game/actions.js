@@ -1,6 +1,6 @@
 import { ACTION_TYPES } from '../config/appConfig';
 import { deriveMood } from './mood';
-import { simulatePetState, getNextWakeTime } from './simulation';
+import { simulatePetState } from './simulation';
 import { toOwnerSummary, toPublicSnapshot } from './publicSnapshot';
 
 function clone(value) {
@@ -128,11 +128,14 @@ export function applyPetAction(petRecord, action, now = Date.now()) {
     }
     case ACTION_TYPES.TOGGLE_LIGHTS: {
       pet.status.lightsOff = action.payload?.lightsOff ?? !pet.status.lightsOff;
-      if (pet.status.lightsOff && (pet.stats.energy < 45 || pet.currentStage !== 'egg')) {
-        pet.status.asleepUntil = getNextWakeTime(pet, now);
-        pet.status.isSleeping = true;
-      } else if (!pet.status.lightsOff) {
+      if (pet.status.lightsOff) {
         pet.status.asleepUntil = null;
+        pet.status.isSleeping = pet.currentStage !== 'egg';
+        if (pet.currentStage !== 'egg') {
+          applyDelta(pet.stats, 'energy', 6);
+        }
+      } else {
+        pet.status.asleepUntil = -1;
         pet.status.isSleeping = false;
         applyDelta(pet.stats, 'happiness', 3);
       }

@@ -73,9 +73,12 @@ export default function KidPlayScreen({
     );
   }
 
+  const manualDayMode = pet.status?.asleepUntil === -1 && !pet.status?.lightsOff;
   const timeLabel = pet.status?.isSleeping || pet.status?.lightsOff
     ? 'Night'
-    : getCurrentTimePeriod(now);
+    : manualDayMode
+      ? 'Day'
+      : getCurrentTimePeriod(now);
   const clockLabel = formatClock(now);
   const eggCountdown = pet.currentStage === 'egg' ? getEggCountdown(pet, now) : '';
 
@@ -127,7 +130,7 @@ export default function KidPlayScreen({
 
       <Card className="kid-actions-card">
         <p className="kid-mode-hint">
-          Drag tools from the pet window: apple to feed, feather to play, sponge to clean, moon to sleep.
+          Drag tools from the pet window. Tap moon or sun to switch between night and day.
         </p>
       </Card>
     </div>

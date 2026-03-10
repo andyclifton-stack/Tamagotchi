@@ -69,6 +69,8 @@ function nextWakeTimestamp(timestamp, stage) {
 }
 
 function canSleep(pet, timestamp) {
+  if (pet.status.asleepUntil === -1 && !pet.status.lightsOff) return false;
+  if (pet.status.lightsOff) return true;
   if (pet.currentStage === 'egg') return false;
   if (pet.status.asleepUntil && pet.status.asleepUntil > timestamp) return true;
   const nearBedtime = isWithinSleepWindow(timestamp, pet.currentStage);

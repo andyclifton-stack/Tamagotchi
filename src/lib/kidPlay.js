@@ -46,8 +46,7 @@ export function mapKidActionToEngineActions(actionId, pet) {
       {
         type: ACTION_TYPES.TOGGLE_LIGHTS,
         payload: { lightsOff: true }
-      },
-      { type: ACTION_TYPES.REST }
+      }
     ];
   }
   if (actionId === 'wake') {
