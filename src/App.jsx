@@ -549,18 +549,18 @@ function OwnerApp() {
       );
     }
 
-    if (!activeProfile) {
-      return (
-        <ProfileLauncher
-          profiles={displayProfiles}
-          activeProfileId={activeProfileId}
-          onSelectProfile={handleSelectProfile}
-          onCreateProfile={handleCreateProfile}
-        />
-      );
-    }
-
     if (screen === 'profilePets') {
+      if (!activeProfile) {
+        return (
+          <ProfileLauncher
+            profiles={displayProfiles}
+            activeProfileId={activeProfileId}
+            onSelectProfile={handleSelectProfile}
+            onCreateProfile={handleCreateProfile}
+          />
+        );
+      }
+
       return (
         <ProfilePetPicker
           profile={activeProfile}
