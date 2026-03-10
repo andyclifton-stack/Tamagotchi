@@ -117,6 +117,7 @@ export function buildPetCodeRecord(pet, accessRecord = null) {
     kind: ACCESS_CODE_RECORD_KIND,
     code,
     petId: pet.id,
+    ownerUid: pet.ownerUid,
     updatedAt: pet.updatedAt || Date.now()
   };
 }
