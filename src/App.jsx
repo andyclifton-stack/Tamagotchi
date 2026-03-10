@@ -16,7 +16,6 @@ import { usePetList } from './hooks/usePetList';
 import { usePetSession } from './hooks/usePetSession';
 import {
   getActiveProfileId as getStoredActiveProfileId,
-  getCachedPetSnapshot,
   loadKidProfiles,
   saveKidProfiles,
   setActiveProfileId as saveActiveProfileId,
@@ -45,7 +44,6 @@ import {
   touchKidProfile
 } from './lib/profiles';
 import { buildAppShareUrl, openWhatsAppShare, shareUrl } from './lib/share';
-import { hasReusablePetSnapshot } from './lib/starterPet';
 import { playSound, unlockAudio } from './lib/audio';
 import { loadPetAccessRecord } from './services/petRepository';
 
@@ -84,12 +82,15 @@ export default function App() {
 function OwnerApp() {
   const boot = useAppBoot(true);
   const petList = usePetList(boot.user?.uid);
-  const accessPetList = useAccessPetList();
+  const [screen, setScreen] = useState('launcher');
+  const accessPetList = useAccessPetList({
+    enabled: screen === 'pets',
+    ownerUid: boot.user?.uid || ''
+  });
   const [profiles, setProfilesState] = useState(loadKidProfiles);
   const [activeProfileId, setActiveProfileIdState] = useState(getStoredActiveProfileId);
   const [selectedPetId, setSelectedPetId] = useState('');
   const [selectedPetSource, setSelectedPetSource] = useState('profile');
-  const [screen, setScreen] = useState('launcher');
   const [notice, setNotice] = useState('');
   const [parentGateOpen, setParentGateOpen] = useState(false);
   const [parentPanelOpen, setParentPanelOpen] = useState(false);
@@ -102,11 +103,8 @@ function OwnerApp() {
   const [pendingAccessRecord, setPendingAccessRecord] = useState(null);
   const [activeAccessGrant, setActiveAccessGrant] = useState(null);
   const [blockedPetIds, setBlockedPetIds] = useState([]);
-  const [restoreRetryTick, setRestoreRetryTick] = useState(0);
 
   const noticeTimerRef = useRef(0);
-  const restoreAttemptedRef = useRef(false);
-  const restoreRetryCountRef = useRef(0);
   const lastReactionRef = useRef('');
   const lastEventKeyRef = useRef('');
   const syncedAdminPetRef = useRef('');
@@ -180,52 +178,6 @@ function OwnerApp() {
       setScreen('profilePets');
     }
   }, [activeProfile, currentProfilePets, selectedPetId, selectedPetSource]);
-
-  useEffect(() => {
-    if (visiblePets.length) {
-      restoreAttemptedRef.current = true;
-      restoreRetryCountRef.current = 0;
-    }
-  }, [visiblePets.length]);
-
-  useEffect(() => {
-    const cachedPet = getCachedPetSnapshot();
-    const shouldRestore =
-      !boot.booting &&
-      Boolean(boot.user?.uid) &&
-      !petList.loading &&
-      visiblePets.length === 0 &&
-      hasReusablePetSnapshot(cachedPet) &&
-      cachedPet?.ownerUid === boot.user?.uid &&
-      !restoreAttemptedRef.current;
-
-    if (!shouldRestore) return;
-
-    restoreAttemptedRef.current = true;
-    session
-      .createPetFromSnapshot(cachedPet)
-      .then(() => {
-        restoreRetryCountRef.current = 0;
-        setNotice('Welcome back!');
-      })
-      .catch((error) => {
-        restoreAttemptedRef.current = false;
-        restoreRetryCountRef.current += 1;
-        setNotice(error.message || 'Could not restore your pet.');
-        if (restoreRetryCountRef.current < 3) {
-          window.setTimeout(() => {
-            setRestoreRetryTick((tick) => tick + 1);
-          }, 1500);
-        }
-      });
-  }, [
-    boot.booting,
-    boot.user?.uid,
-    petList.loading,
-    restoreRetryTick,
-    session,
-    visiblePets.length
-  ]);
 
   useEffect(() => {
     if (!session.error) return;
