@@ -9,6 +9,7 @@ import ProfilePetPicker from './components/ProfilePetPicker';
 import PublicPetView from './components/PublicPetView';
 import Button from './components/ui/Button';
 import Card from './components/ui/Card';
+import PinPrompt from './components/PinPrompt';
 import { useAppBoot } from './hooks/useAppBoot';
 import { usePetList } from './hooks/usePetList';
 import { usePetSession } from './hooks/usePetSession';
