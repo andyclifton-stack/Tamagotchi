@@ -1,13 +1,29 @@
 import { decryptSecretWithPin, encryptSecretWithPin } from './pin';
 
 export const ACCESS_RECORD_KIND = 'pet-access';
+export const ACCESS_CODE_RECORD_KIND = 'pet-code';
 
 export function buildPetAccessKey(petId) {
   return `pet_${petId}`;
 }
 
+export function buildPetCodeKey(code) {
+  return `code_${String(code || '').trim().toUpperCase()}`;
+}
+
+export function derivePetCode(petId) {
+  return String(petId || '')
+    .replace(/-/g, '')
+    .slice(0, 8)
+    .toUpperCase();
+}
+
 export function isPetAccessRecord(record) {
   return record?.kind === ACCESS_RECORD_KIND && Boolean(record?.petId);
+}
+
+export function isPetCodeRecord(record) {
+  return record?.kind === ACCESS_CODE_RECORD_KIND && Boolean(record?.petId) && Boolean(record?.code);
 }
 
 export function toPetAccessSummary(record) {
@@ -19,6 +35,7 @@ export function toPetAccessSummary(record) {
     id: record.petId,
     petId: record.petId,
     accessKey: record.accessKey || buildPetAccessKey(record.petId),
+    petCode: record.petCode || derivePetCode(record.petId),
     ownerUid: record.ownerUid,
     name: record.name,
     speciesId: record.speciesId,
@@ -53,6 +70,7 @@ export async function buildPetAccessRecord(
   const nextRecord = {
     kind: ACCESS_RECORD_KIND,
     accessKey: buildPetAccessKey(pet.id),
+    petCode: existingRecord?.petCode || derivePetCode(pet.id),
     petId: pet.id,
     ownerUid: pet.ownerUid,
     name: pet.name,
@@ -87,6 +105,20 @@ export async function buildPetAccessRecord(
   }
 
   return nextRecord;
+}
+
+export function buildPetCodeRecord(pet, accessRecord = null) {
+  if (!pet?.id || !pet.pinEnabled) {
+    return null;
+  }
+
+  const code = accessRecord?.petCode || derivePetCode(pet.id);
+  return {
+    kind: ACCESS_CODE_RECORD_KIND,
+    code,
+    petId: pet.id,
+    updatedAt: pet.updatedAt || Date.now()
+  };
 }
 
 export async function unlockPetAccess(record, pin) {

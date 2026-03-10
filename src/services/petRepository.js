@@ -4,6 +4,8 @@ import { firebaseConfig, firebaseDatabase } from '../config/firebase';
 import { toOwnerSummary, toPublicSnapshot } from '../game/publicSnapshot';
 import {
   buildPetAccessKey,
+  buildPetCodeKey,
+  buildPetCodeRecord,
   buildPetAccessRecord,
   isPetAccessRecord,
   toPetAccessSummary
@@ -28,6 +30,10 @@ function publicPetsPath(token) {
 
 function accessPetPath(petId) {
   return publicPetsPath(buildPetAccessKey(petId));
+}
+
+function accessCodePath(code) {
+  return publicPetsPath(buildPetCodeKey(code));
 }
 
 function eventsPath(petId) {
@@ -130,6 +136,7 @@ export async function createPetRecord(pet, options = {}) {
   updates[`${ownerPetsPath(pet.ownerUid)}/${pet.id}`] = toOwnerSummary(pet);
   if (options.accessRecord) {
     updates[accessPetPath(pet.id)] = options.accessRecord;
+    updates[accessCodePath(options.accessRecord.petCode)] = buildPetCodeRecord(pet, options.accessRecord);
   }
   await applyUpdates(updates, options.grant || null);
   return pet;
@@ -153,23 +160,6 @@ export function subscribeOwnerPets(ownerUid, callback, onError) {
   );
 }
 
-export function subscribeAccessPets(callback, onError) {
-  const accessRef = ref(firebaseDatabase, `${ROOT_PATH}/publicPets`);
-  return onValue(
-    accessRef,
-    (snapshot) => {
-      const value = snapshot.val() || {};
-      const items = Object.values(value)
-        .filter((record) => isPetAccessRecord(record) && record.pinEnabled)
-        .map((record) => toPetAccessSummary(record))
-        .filter(Boolean)
-        .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-      callback(items);
-    },
-    onError
-  );
-}
-
 export async function loadPet(petId, grant = null) {
   return readJson(petsPath(petId), grant);
 }
@@ -181,6 +171,10 @@ export async function loadPublicPet(shareToken) {
 
 export async function loadPetAccessRecord(petId) {
   return readJson(accessPetPath(petId));
+}
+
+export async function loadPetAccessCodeRecord(code) {
+  return readJson(accessCodePath(code));
 }
 
 export async function savePetSimulation(result, options = {}) {
@@ -204,9 +198,14 @@ export async function savePetSimulation(result, options = {}) {
     });
     if (accessRecord) {
       updates[accessPetPath(pet.id)] = accessRecord;
+      updates[accessCodePath(accessRecord.petCode)] = buildPetCodeRecord(pet, accessRecord);
     }
   } else {
     updates[accessPetPath(pet.id)] = null;
+    const petCode = existingAccessRecord?.petCode;
+    if (petCode) {
+      updates[accessCodePath(petCode)] = null;
+    }
   }
 
   Object.assign(updates, makeEventMap(pet.id, events));
@@ -235,6 +234,10 @@ export async function deletePet(petId, options = {}) {
   updates[`${ownerPetsPath(pet.ownerUid)}/${petId}`] = null;
   updates[eventsPath(petId)] = null;
   updates[accessPetPath(petId)] = null;
+  const accessRecord = await loadPetAccessRecord(petId);
+  if (accessRecord?.petCode) {
+    updates[accessCodePath(accessRecord.petCode)] = null;
+  }
   if (pet.share?.shareToken) {
     updates[publicPetsPath(pet.share.shareToken)] = null;
   }

@@ -9,8 +9,6 @@ import ProfilePetPicker from './components/ProfilePetPicker';
 import PublicPetView from './components/PublicPetView';
 import Button from './components/ui/Button';
 import Card from './components/ui/Card';
-import PinPrompt from './components/PinPrompt';
-import { useAccessPetList } from './hooks/useAccessPetList';
 import { useAppBoot } from './hooks/useAppBoot';
 import { usePetList } from './hooks/usePetList';
 import { usePetSession } from './hooks/usePetSession';
@@ -45,7 +43,7 @@ import {
 } from './lib/profiles';
 import { buildAppShareUrl, openWhatsAppShare, shareUrl } from './lib/share';
 import { playSound, unlockAudio } from './lib/audio';
-import { loadPetAccessRecord } from './services/petRepository';
+import { loadPetAccessCodeRecord, loadPetAccessRecord } from './services/petRepository';
 
 function parseViewMode() {
   const params = new URLSearchParams(window.location.search);
@@ -83,10 +81,6 @@ function OwnerApp() {
   const boot = useAppBoot(true);
   const petList = usePetList(boot.user?.uid);
   const [screen, setScreen] = useState('launcher');
-  const accessPetList = useAccessPetList({
-    enabled: screen === 'pets',
-    ownerUid: boot.user?.uid || ''
-  });
   const [profiles, setProfilesState] = useState(loadKidProfiles);
   const [activeProfileId, setActiveProfileIdState] = useState(getStoredActiveProfileId);
   const [selectedPetId, setSelectedPetId] = useState('');
@@ -98,9 +92,8 @@ function OwnerApp() {
   const [parentSessionPin, setParentSessionPin] = useState('');
   const [petPinPromptOpen, setPetPinPromptOpen] = useState(false);
   const [petPinError, setPetPinError] = useState('');
-  const [accessPinPromptOpen, setAccessPinPromptOpen] = useState(false);
-  const [accessPinError, setAccessPinError] = useState('');
-  const [pendingAccessRecord, setPendingAccessRecord] = useState(null);
+  const [accessScreenError, setAccessScreenError] = useState('');
+  const [accessScreenLoading, setAccessScreenLoading] = useState(false);
   const [activeAccessGrant, setActiveAccessGrant] = useState(null);
   const [blockedPetIds, setBlockedPetIds] = useState([]);
 
@@ -137,7 +130,6 @@ function OwnerApp() {
   const activePet =
     session.pet ||
     visiblePets.find((pet) => pet.id === selectedPetId) ||
-    accessPetList.pets.find((pet) => pet.petId === selectedPetId) ||
     null;
 
   const setProfiles = (nextProfiles) => {
@@ -421,20 +413,24 @@ function OwnerApp() {
     setPetPinError('PIN did not match.');
   };
 
-  const handleOpenAccessPet = async (petSummary) => {
+  const handleOpenAccessPet = async ({ code, pin }) => {
+    setAccessScreenLoading(true);
+    setAccessScreenError('');
     try {
-      const accessRecord = await loadPetAccessRecord(petSummary.petId);
+      const codeRecord = await loadPetAccessCodeRecord(code);
+      if (!codeRecord?.petId) {
+        setAccessScreenError('Pet code not found.');
+        return;
+      }
+      const accessRecord = await loadPetAccessRecord(codeRecord.petId);
       if (!accessRecord) {
-        showNotice('That pet is not ready for anywhere access yet.');
+        setAccessScreenError('That pet is not ready for anywhere access yet.');
         return;
       }
 
       if (parentSessionPin) {
         const adminGrant = await unlockPetAdminAccess(accessRecord, parentSessionPin);
         if (adminGrant) {
-          setPendingAccessRecord(null);
-          setAccessPinPromptOpen(false);
-          setAccessPinError('');
           openSelectedPet(accessRecord.petId, 'access', adminGrant, {
             careUnlocked: true,
             adminUnlocked: true
@@ -443,31 +439,21 @@ function OwnerApp() {
           return;
         }
       }
-
-      setPendingAccessRecord(accessRecord);
-      setAccessPinPromptOpen(true);
-      setAccessPinError('');
-    } catch (error) {
-      showNotice(error.message || 'Could not open that pet.');
-    }
-  };
-
-  const handleConfirmAccessPin = async (pin) => {
-    if (!pendingAccessRecord) return;
-    const grant = await unlockPetAccess(pendingAccessRecord, pin);
-    if (!grant) {
-      setAccessPinError('PIN did not match.');
-      return;
-    }
-
-    setPendingAccessRecord(null);
-    setAccessPinPromptOpen(false);
-    setAccessPinError('');
-    openSelectedPet(pendingAccessRecord.petId, 'access', grant, {
+      const grant = await unlockPetAccess(accessRecord, pin);
+      if (!grant) {
+        setAccessScreenError('PIN did not match.');
+        return;
+      }
+      openSelectedPet(accessRecord.petId, 'access', grant, {
       careUnlocked: true,
       adminUnlocked: false
-    });
-    showNotice('Pet opened.');
+      });
+      showNotice('Pet opened.');
+    } catch (error) {
+      setAccessScreenError(error.message || 'Could not open that pet.');
+    } finally {
+      setAccessScreenLoading(false);
+    }
   };
 
   const handleSelectProfile = (profileId) => {
@@ -554,9 +540,8 @@ function OwnerApp() {
     if (screen === 'pets') {
       return (
         <PetAccessScreen
-          pets={accessPetList.pets}
-          loading={accessPetList.loading}
-          error={accessPetList.error}
+          loading={accessScreenLoading}
+          error={accessScreenError}
           parentReady={Boolean(parentSessionPin)}
           onOpenPet={handleOpenAccessPet}
         />
@@ -737,20 +722,6 @@ function OwnerApp() {
           setPetPinError('');
         }}
         onConfirm={handleUnlockPet}
-      />
-
-      <PinPrompt
-        open={accessPinPromptOpen}
-        title="Open Pet"
-        description="Enter the access PIN you gave this pet."
-        error={accessPinError}
-        confirmLabel="Open Pet"
-        onClose={() => {
-          setAccessPinPromptOpen(false);
-          setAccessPinError('');
-          setPendingAccessRecord(null);
-        }}
-        onConfirm={handleConfirmAccessPin}
       />
     </div>
   );

@@ -1,6 +1,7 @@
 export function toOwnerSummary(pet) {
   return {
     id: pet.id,
+    petCode: pet.petCode || '',
     name: pet.name,
     nameKey: pet.nameKey,
     speciesId: pet.speciesId,

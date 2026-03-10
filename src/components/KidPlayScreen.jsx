@@ -3,6 +3,7 @@ import Card from './ui/Card';
 import PetScene from './PetScene';
 import { formatStage } from '../lib/format';
 import { HATCH_MS } from '../data/evolutionRules';
+import { derivePetCode } from '../lib/petAccess';
 import { pickIdleEmote, pickPokeReaction } from '../lib/pokeReactions';
 import { playSound } from '../lib/audio';
 
@@ -132,6 +133,7 @@ export default function KidPlayScreen({
   const clockLabel = formatClock(now);
   const eggCountdown = pet.currentStage === 'egg' ? getEggCountdown(pet, now) : '';
   const sceneReaction = pokeReaction?.animation || lastReaction;
+  const petCode = derivePetCode(pet.id);
 
   const handlePetPoke = () => {
     if (saving) return;
@@ -189,6 +191,10 @@ export default function KidPlayScreen({
 
         <p className="kid-mode-hint">
           Drag the tools to care. Tap your pet to get a cute reaction.
+        </p>
+
+        <p className="kid-mode-hint kid-mode-hint--code">
+          Pet code: <strong>{petCode}</strong>
         </p>
 
         {!canEdit && pet.pinEnabled ? (
