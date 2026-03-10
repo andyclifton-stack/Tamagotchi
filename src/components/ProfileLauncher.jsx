@@ -36,7 +36,7 @@ export default function ProfileLauncher({
         <p className="eyebrow">Who&apos;s Playing?</p>
         <h2 className="hero-title">Pick your player and jump in.</h2>
         <p className="hero-copy">
-          Everyone gets their own little pet world on this device.
+          First make a player spot for the child. On the next screen, you will name the pet.
         </p>
       </Card>
 
@@ -77,7 +77,7 @@ export default function ProfileLauncher({
           <div className="section-head section-head--compact">
             <div>
               <span className="field-label">New Player</span>
-              <p className="muted-text">Choose a picture and type a name.</p>
+              <p className="muted-text">This is the child name, not the pet name.</p>
             </div>
             <Button
               type="button"
@@ -90,12 +90,12 @@ export default function ProfileLauncher({
           </div>
 
           <label className="field">
-            <span className="field-label">Name</span>
+            <span className="field-label">Player Name</span>
             <input
               className="field-input"
               value={name}
               maxLength={18}
-              placeholder="Type a name"
+              placeholder="Type the child name"
               onChange={(event) => setName(event.target.value)}
             />
           </label>
@@ -120,7 +120,7 @@ export default function ProfileLauncher({
             disabled={working || !name.trim()}
             onClick={handleCreate}
           >
-            {working ? 'Making player...' : 'Start Playing'}
+            {working ? 'Making player...' : 'Next: Name Pet'}
           </Button>
         </Card>
       ) : null}

@@ -62,7 +62,7 @@ export default function ProfilePetPicker({
           <div>
             <p className="eyebrow">{isSharedProfileId(profile?.id) ? 'Shared Pets' : 'Player'}</p>
             <h2 className="hero-title">{profile?.name || 'Choose a Pet'}</h2>
-            <p className="hero-copy">Pick a pet or make a brand new buddy.</p>
+            <p className="hero-copy">Now pick the pet and choose the pet name.</p>
           </div>
         </div>
       </Card>
@@ -100,7 +100,7 @@ export default function ProfilePetPicker({
           <div className="section-head section-head--compact">
             <div>
               <span className="field-label">Make a Pet</span>
-              <p className="muted-text">Pick a pet type and choose a name.</p>
+              <p className="muted-text">This is the pet name that will show in the game.</p>
             </div>
             <Button
               type="button"
