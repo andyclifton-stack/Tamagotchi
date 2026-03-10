@@ -1740,3 +1740,25 @@
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
+
+.access-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.access-search-card {
+  padding: 1rem;
+}
+
+.access-grid {
+  gap: 0.9rem;
+}
+
+.access-pet-card {
+  align-items: flex-start;
+}
+
+.access-pet-card .pill-tag {
+  margin-top: 0.35rem;
+}

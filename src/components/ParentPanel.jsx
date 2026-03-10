@@ -14,6 +14,7 @@ export default function ParentPanel({
   onSelectPet,
   onCreatePet,
   onRenamePet,
+  onSetPetPin,
   onAssignProfile,
   onDeletePet,
   onShareApp,
@@ -25,8 +26,10 @@ export default function ParentPanel({
   const [createName, setCreateName] = useState('');
   const [createSpecies, setCreateSpecies] = useState('mochi');
   const [createProfileId, setCreateProfileId] = useState('');
+  const [createPin, setCreatePin] = useState('');
   const [renameValue, setRenameValue] = useState('');
   const [selectedProfileId, setSelectedProfileId] = useState('');
+  const [selectedPin, setSelectedPin] = useState('');
   const [working, setWorking] = useState(false);
   const activePet = useMemo(
     () => pets.find((pet) => pet.id === selectedPetId) || pets[0] || null,
@@ -37,9 +40,11 @@ export default function ParentPanel({
     if (activePet) {
       setRenameValue(activePet.name);
       setSelectedProfileId(activePet.profileId || 'shared');
+      setSelectedPin('');
     } else {
       setRenameValue('');
       setSelectedProfileId('shared');
+      setSelectedPin('');
     }
   }, [activePet?.id]);
 
@@ -56,10 +61,11 @@ export default function ParentPanel({
         profileId: createProfileId || 'shared',
         theme: 'soft3d',
         liveForeverMode: true,
-        pin: ''
+        pin: createPin
       });
       setCreateName('');
       setCreateSpecies('mochi');
+      setCreatePin('');
       setShowCreate(false);
     } finally {
       setWorking(false);
@@ -82,6 +88,17 @@ export default function ParentPanel({
     setWorking(true);
     try {
       await onAssignProfile(selectedProfileId || 'shared');
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const handleSavePin = async () => {
+    if (!activePet || selectedPin.length < 4) return;
+    setWorking(true);
+    try {
+      await onSetPetPin(selectedPin);
+      setSelectedPin('');
     } finally {
       setWorking(false);
     }
@@ -181,12 +198,23 @@ export default function ParentPanel({
                       <option key={profile.id} value={profile.id}>
                         {profile.name}
                       </option>
-                    ))}
+                  ))}
                 </select>
+              </label>
+              <label className="field">
+                <span className="field-label">Access PIN</span>
+                <input
+                  className="field-input"
+                  value={createPin}
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="4 to 6 digits"
+                  onChange={(event) => setCreatePin(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                />
               </label>
               <Button
                 type="button"
-                disabled={working || !createName.trim()}
+                disabled={working || !createName.trim() || createPin.length < 4}
                 onClick={handleCreate}
               >
                 {working ? 'Creating...' : 'Create'}
@@ -228,6 +256,25 @@ export default function ParentPanel({
                   Delete Pet
                 </Button>
               </div>
+              <label className="field">
+                <span className="field-label">Change Access PIN</span>
+                <input
+                  className="field-input"
+                  value={selectedPin}
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="4 to 6 digits"
+                  onChange={(event) => setSelectedPin(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                />
+              </label>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={working || selectedPin.length < 4}
+                onClick={handleSavePin}
+              >
+                Save PIN
+              </Button>
               <label className="field">
                 <span className="field-label">Move To Profile</span>
                 <select

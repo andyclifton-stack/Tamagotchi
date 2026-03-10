@@ -27,6 +27,7 @@ export default function ProfilePetPicker({
   const [createOpen, setCreateOpen] = useState(pets.length === 0);
   const [name, setName] = useState('');
   const [speciesId, setSpeciesId] = useState('mochi');
+  const [pin, setPin] = useState('');
   const [working, setWorking] = useState(false);
 
   useEffect(() => {
@@ -36,15 +37,17 @@ export default function ProfilePetPicker({
   }, [pets.length]);
 
   const handleCreate = async () => {
-    if (!name.trim()) return;
+    if (!name.trim() || pin.length < 4) return;
     setWorking(true);
     try {
       await onCreatePet({
         name,
-        speciesId
+        speciesId,
+        pin
       });
       setName('');
       setSpeciesId('mochi');
+      setPin('');
       setCreateOpen(false);
     } finally {
       setWorking(false);
@@ -120,6 +123,21 @@ export default function ProfilePetPicker({
             />
           </label>
 
+          <label className="field">
+            <span className="field-label">Access PIN</span>
+            <input
+              className="field-input"
+              value={pin}
+              inputMode="numeric"
+              maxLength={6}
+              placeholder="4 to 6 digits"
+              onChange={(event) => setPin(event.target.value.replace(/\D/g, '').slice(0, 6))}
+            />
+            <small className="muted-text">
+              Use this PIN on your phone, laptop, or tablet to open the same pet.
+            </small>
+          </label>
+
           <div className="species-chip-grid">
             {PET_TYPES.map((petType) => (
               <SpeciesButton
@@ -134,7 +152,7 @@ export default function ProfilePetPicker({
           <Button
             type="button"
             block
-            disabled={working || !name.trim()}
+            disabled={working || !name.trim() || pin.length < 4}
             onClick={handleCreate}
           >
             {working ? 'Making pet...' : 'Create Pet'}

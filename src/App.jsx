@@ -3,11 +3,14 @@ import AppShell from './components/AppShell';
 import KidPlayScreen from './components/KidPlayScreen';
 import ParentGateModal from './components/ParentGateModal';
 import ParentPanel from './components/ParentPanel';
+import PetAccessScreen from './components/PetAccessScreen';
 import ProfileLauncher from './components/ProfileLauncher';
 import ProfilePetPicker from './components/ProfilePetPicker';
 import PublicPetView from './components/PublicPetView';
+import Button from './components/ui/Button';
 import Card from './components/ui/Card';
 import PinPrompt from './components/PinPrompt';
+import { useAccessPetList } from './hooks/useAccessPetList';
 import { useAppBoot } from './hooks/useAppBoot';
 import { usePetList } from './hooks/usePetList';
 import { usePetSession } from './hooks/usePetSession';
@@ -17,7 +20,8 @@ import {
   loadKidProfiles,
   saveKidProfiles,
   setActiveProfileId as saveActiveProfileId,
-  setLastPetId
+  setLastPetId,
+  setUnlockState
 } from './lib/storage';
 import {
   getParentAccess,
@@ -30,9 +34,8 @@ import {
   mapKidActionToEngineActions,
   shouldShowMedicine
 } from './lib/kidPlay';
-import { hasReusablePetSnapshot } from './lib/starterPet';
-import { buildAppShareUrl, openWhatsAppShare, shareUrl } from './lib/share';
-import { playSound, unlockAudio } from './lib/audio';
+import { createSalt, hashPin } from './lib/pin';
+import { unlockPetAccess, unlockPetAdminAccess } from './lib/petAccess';
 import {
   buildPetProfileFields,
   createKidProfile,
@@ -41,6 +44,10 @@ import {
   isSharedProfileId,
   touchKidProfile
 } from './lib/profiles';
+import { buildAppShareUrl, openWhatsAppShare, shareUrl } from './lib/share';
+import { hasReusablePetSnapshot } from './lib/starterPet';
+import { playSound, unlockAudio } from './lib/audio';
+import { loadPetAccessRecord } from './services/petRepository';
 
 function parseViewMode() {
   const params = new URLSearchParams(window.location.search);
@@ -77,16 +84,23 @@ export default function App() {
 function OwnerApp() {
   const boot = useAppBoot(true);
   const petList = usePetList(boot.user?.uid);
+  const accessPetList = useAccessPetList();
   const [profiles, setProfilesState] = useState(loadKidProfiles);
   const [activeProfileId, setActiveProfileIdState] = useState(getStoredActiveProfileId);
   const [selectedPetId, setSelectedPetId] = useState('');
+  const [selectedPetSource, setSelectedPetSource] = useState('profile');
   const [screen, setScreen] = useState('launcher');
   const [notice, setNotice] = useState('');
   const [parentGateOpen, setParentGateOpen] = useState(false);
   const [parentPanelOpen, setParentPanelOpen] = useState(false);
   const [hasParentPin, setHasParentPin] = useState(false);
+  const [parentSessionPin, setParentSessionPin] = useState('');
   const [petPinPromptOpen, setPetPinPromptOpen] = useState(false);
   const [petPinError, setPetPinError] = useState('');
+  const [accessPinPromptOpen, setAccessPinPromptOpen] = useState(false);
+  const [accessPinError, setAccessPinError] = useState('');
+  const [pendingAccessRecord, setPendingAccessRecord] = useState(null);
+  const [activeAccessGrant, setActiveAccessGrant] = useState(null);
   const [blockedPetIds, setBlockedPetIds] = useState([]);
   const [restoreRetryTick, setRestoreRetryTick] = useState(0);
 
@@ -95,10 +109,13 @@ function OwnerApp() {
   const restoreRetryCountRef = useRef(0);
   const lastReactionRef = useRef('');
   const lastEventKeyRef = useRef('');
+  const syncedAdminPetRef = useRef('');
 
   const session = usePetSession({
     petId: selectedPetId,
-    ownerUid: boot.user?.uid || ''
+    ownerUid: boot.user?.uid || '',
+    accessGrant: activeAccessGrant,
+    parentPin: parentSessionPin
   });
 
   const visiblePets = useMemo(
@@ -120,7 +137,10 @@ function OwnerApp() {
   );
 
   const activePet =
-    visiblePets.find((pet) => pet.id === selectedPetId) || null;
+    session.pet ||
+    visiblePets.find((pet) => pet.id === selectedPetId) ||
+    accessPetList.pets.find((pet) => pet.petId === selectedPetId) ||
+    null;
 
   const setProfiles = (nextProfiles) => {
     setProfilesState((current) => {
@@ -147,18 +167,19 @@ function OwnerApp() {
     if (activeProfileId && !displayProfiles.some((profile) => profile.id === activeProfileId)) {
       setActiveProfile('');
       setSelectedPetId('');
+      setActiveAccessGrant(null);
       setScreen('launcher');
     }
   }, [activeProfileId, displayProfiles]);
 
   useEffect(() => {
-    if (!selectedPetId || !activeProfile) return;
+    if (!selectedPetId || !activeProfile || selectedPetSource !== 'profile') return;
     const stillVisible = currentProfilePets.some((pet) => pet.id === selectedPetId);
     if (!stillVisible) {
       setSelectedPetId('');
       setScreen('profilePets');
     }
-  }, [activeProfile, currentProfilePets, selectedPetId]);
+  }, [activeProfile, currentProfilePets, selectedPetId, selectedPetSource]);
 
   useEffect(() => {
     if (visiblePets.length) {
@@ -213,13 +234,14 @@ function OwnerApp() {
         current.includes(selectedPetId) ? current : [...current, selectedPetId]
       );
       setSelectedPetId('');
-      setScreen(activeProfile ? 'profilePets' : 'launcher');
-      setNotice('That pet could not be opened on this device.');
+      setActiveAccessGrant(null);
+      setScreen(selectedPetSource === 'access' ? 'pets' : activeProfile ? 'profilePets' : 'launcher');
+      setNotice('That pet could not be opened here.');
       return;
     }
 
     setNotice(session.error);
-  }, [activeProfile, selectedPetId, session.error]);
+  }, [activeProfile, selectedPetId, selectedPetSource, session.error]);
 
   useEffect(() => {
     if (!boot.settings.soundEnabled) return;
@@ -239,11 +261,20 @@ function OwnerApp() {
     if (latest.type === 'illness' || latest.type === 'care-center') playSound('sad', true);
   }, [boot.settings.soundEnabled, session.lastEvents]);
 
-  useEffect(() => {
-    return () => {
-      window.clearTimeout(noticeTimerRef.current);
-    };
+  useEffect(() => () => {
+    window.clearTimeout(noticeTimerRef.current);
   }, []);
+
+  useEffect(() => {
+    if (!parentSessionPin || !parentPanelOpen || !session.pet?.id) return;
+    if (session.pet.ownerUid !== boot.user?.uid) return;
+    if (syncedAdminPetRef.current === session.pet.id) return;
+
+    syncedAdminPetRef.current = session.pet.id;
+    session.syncPetAccess().catch(() => {
+      syncedAdminPetRef.current = '';
+    });
+  }, [boot.user?.uid, parentPanelOpen, parentSessionPin, session]);
 
   const showNotice = (message) => {
     setNotice(message);
@@ -255,6 +286,28 @@ function OwnerApp() {
     ? !session.pet.pinEnabled || session.unlockState.careUnlocked
     : false;
   const kidNeeds = deriveKidNeeds(session.pet);
+
+  const openSelectedPet = (petId, source, grant = null, unlockOptions = {}) => {
+    if (petId) {
+      setLastPetId(petId);
+      setSelectedPetId(petId);
+      setSelectedPetSource(source);
+    }
+    setActiveAccessGrant(grant);
+    if (petId) {
+      const nextUnlock = setUnlockState(petId, {
+        careUnlocked: unlockOptions.careUnlocked ?? true,
+        adminUnlocked: unlockOptions.adminUnlocked ?? false
+      });
+      if (session.pet?.id === petId) {
+        session.setError('');
+      }
+      if (session.unlockState.expiresAt !== nextUnlock.expiresAt && session.pet?.id === petId) {
+        // The hook refreshes from storage on petId change; this keeps open-by-PIN feeling instant.
+      }
+    }
+    setScreen('play');
+  };
 
   const handleKidAction = async (actionId) => {
     const actions = mapKidActionToEngineActions(actionId, session.pet);
@@ -321,7 +374,9 @@ function OwnerApp() {
     const result = await setupParentPin(pin, confirmPin);
     if (result.ok) {
       setHasParentPin(true);
+      setParentSessionPin(pin);
       setParentPanelOpen(true);
+      setParentGateOpen(false);
     }
     return result;
   };
@@ -329,7 +384,9 @@ function OwnerApp() {
   const handleParentUnlock = async (pin) => {
     const result = await unlockParentGate(pin);
     if (result.ok) {
+      setParentSessionPin(pin);
       setParentPanelOpen(true);
+      setParentGateOpen(false);
     }
     return result;
   };
@@ -342,6 +399,22 @@ function OwnerApp() {
       showNotice('Name updated.');
     } catch (error) {
       showNotice(error.message || 'Could not rename pet.');
+    }
+  };
+
+  const handleSetPetPin = async (pin) => {
+    if (!session.pet || pin.length < 4) return;
+    try {
+      const pinSalt = createSalt();
+      const pinHash = await hashPin(pin, pinSalt);
+      await session.savePetEdit((nextPet) => {
+        nextPet.pinEnabled = true;
+        nextPet.pinHash = pinHash;
+        nextPet.pinSalt = pinSalt;
+      }, 'Pet PIN updated.', { petPin: pin });
+      showNotice('Pet PIN updated.');
+    } catch (error) {
+      showNotice(error.message || 'Could not save the pet PIN.');
     }
   };
 
@@ -366,7 +439,8 @@ function OwnerApp() {
     try {
       await session.removePet();
       setSelectedPetId('');
-      setScreen(activeProfile ? 'profilePets' : 'launcher');
+      setActiveAccessGrant(null);
+      setScreen(selectedPetSource === 'access' ? 'pets' : activeProfile ? 'profilePets' : 'launcher');
       showNotice('Pet deleted.');
     } catch (error) {
       showNotice(error.message || 'Could not delete pet.');
@@ -394,6 +468,55 @@ function OwnerApp() {
     setPetPinError('PIN did not match.');
   };
 
+  const handleOpenAccessPet = async (petSummary) => {
+    try {
+      const accessRecord = await loadPetAccessRecord(petSummary.petId);
+      if (!accessRecord) {
+        showNotice('That pet is not ready for anywhere access yet.');
+        return;
+      }
+
+      if (parentSessionPin) {
+        const adminGrant = await unlockPetAdminAccess(accessRecord, parentSessionPin);
+        if (adminGrant) {
+          setPendingAccessRecord(null);
+          setAccessPinPromptOpen(false);
+          setAccessPinError('');
+          openSelectedPet(accessRecord.petId, 'access', adminGrant, {
+            careUnlocked: true,
+            adminUnlocked: true
+          });
+          showNotice('Parent override opened the pet.');
+          return;
+        }
+      }
+
+      setPendingAccessRecord(accessRecord);
+      setAccessPinPromptOpen(true);
+      setAccessPinError('');
+    } catch (error) {
+      showNotice(error.message || 'Could not open that pet.');
+    }
+  };
+
+  const handleConfirmAccessPin = async (pin) => {
+    if (!pendingAccessRecord) return;
+    const grant = await unlockPetAccess(pendingAccessRecord, pin);
+    if (!grant) {
+      setAccessPinError('PIN did not match.');
+      return;
+    }
+
+    setPendingAccessRecord(null);
+    setAccessPinPromptOpen(false);
+    setAccessPinError('');
+    openSelectedPet(pendingAccessRecord.petId, 'access', grant, {
+      careUnlocked: true,
+      adminUnlocked: false
+    });
+    showNotice('Pet opened.');
+  };
+
   const handleSelectProfile = (profileId) => {
     if (!isSharedProfileId(profileId)) {
       setProfiles((current) =>
@@ -404,6 +527,7 @@ function OwnerApp() {
     }
     setActiveProfile(profileId);
     setSelectedPetId('');
+    setActiveAccessGrant(null);
     setScreen('profilePets');
     playSound('profileSelect', boot.settings.soundEnabled);
   };
@@ -413,6 +537,7 @@ function OwnerApp() {
     setProfiles((current) => [newProfile, ...current]);
     setActiveProfile(newProfile.id);
     setSelectedPetId('');
+    setActiveAccessGrant(null);
     setScreen('profilePets');
     playSound('profileCreate', boot.settings.soundEnabled);
     showNotice(`${newProfile.name} is ready!`);
@@ -420,10 +545,8 @@ function OwnerApp() {
   };
 
   const handleSelectPet = (petId) => {
-    setSelectedPetId(petId);
-    setLastPetId(petId);
-    setScreen('play');
     playSound('profileSelect', boot.settings.soundEnabled);
+    openSelectedPet(petId, 'profile', null, { careUnlocked: false, adminUnlocked: false });
   };
 
   const handleCreatePetForProfile = async (input) => {
@@ -433,9 +556,10 @@ function OwnerApp() {
       ...input,
       theme: 'soft3d',
       liveForeverMode: true,
-      pin: '',
       ...profileFields
     });
+    setSelectedPetSource('profile');
+    setActiveAccessGrant(null);
     setSelectedPetId(newPet.id);
     setLastPetId(newPet.id);
     setScreen('play');
@@ -446,7 +570,7 @@ function OwnerApp() {
   };
 
   const renderBody = () => {
-    if (boot.booting || petList.loading) {
+    if (boot.booting || (screen !== 'pets' && petList.loading)) {
       return (
         <Card className="empty-card">
           <h2>Loading...</h2>
@@ -474,6 +598,18 @@ function OwnerApp() {
       );
     }
 
+    if (screen === 'pets') {
+      return (
+        <PetAccessScreen
+          pets={accessPetList.pets}
+          loading={accessPetList.loading}
+          error={accessPetList.error}
+          parentReady={Boolean(parentSessionPin)}
+          onOpenPet={handleOpenAccessPet}
+        />
+      );
+    }
+
     if (!activeProfile) {
       return (
         <ProfileLauncher
@@ -496,7 +632,7 @@ function OwnerApp() {
       );
     }
 
-    if (!activePet || !session.pet || session.pet.id !== activePet.id) {
+    if (!session.pet || session.pet.id !== selectedPetId) {
       return (
         <Card className="empty-card">
           <h2>Getting your pet ready...</h2>
@@ -528,7 +664,24 @@ function OwnerApp() {
       ? 'Who is playing?'
       : screen === 'profilePets'
         ? activeProfile?.name || 'Choose a pet'
-        : 'Tap to care';
+        : screen === 'pets'
+          ? 'Pets Screen'
+          : activePet?.name || 'Tap to care';
+
+  const shellActions = (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      onClick={() => {
+        setSelectedPetId('');
+        setActiveAccessGrant(null);
+        setScreen('pets');
+      }}
+    >
+      Pets
+    </Button>
+  );
 
   return (
     <div onPointerDownCapture={() => unlockAudio()}>
@@ -541,21 +694,27 @@ function OwnerApp() {
           screen === 'play'
             ? () => {
               setSelectedPetId('');
-              setScreen('profilePets');
+              setActiveAccessGrant(null);
+              setScreen(selectedPetSource === 'access' ? 'pets' : 'profilePets');
             }
-            : screen === 'profilePets'
-              ? () => setScreen('launcher')
+            : screen === 'profilePets' || screen === 'pets'
+              ? () => {
+                setSelectedPetId('');
+                setActiveAccessGrant(null);
+                setScreen('launcher');
+              }
               : null
         }
         onHome={
-          screen === 'play' || screen === 'profilePets'
+          screen === 'play' || screen === 'profilePets' || screen === 'pets'
             ? () => {
               setSelectedPetId('');
+              setActiveAccessGrant(null);
               setScreen('launcher');
             }
             : null
         }
-        actions={null}
+        actions={shellActions}
       >
         {renderBody()}
       </AppShell>
@@ -577,10 +736,14 @@ function OwnerApp() {
         onClose={() => setParentPanelOpen(false)}
         onLockGate={() => {
           lockParentGate();
+          setParentSessionPin('');
+          syncedAdminPetRef.current = '';
           setParentPanelOpen(false);
           showNotice('Parent space locked.');
         }}
         onSelectPet={(petId) => {
+          setActiveAccessGrant(null);
+          setSelectedPetSource('profile');
           setSelectedPetId(petId);
           setLastPetId(petId);
           setScreen('play');
@@ -593,12 +756,15 @@ function OwnerApp() {
             ...input,
             ...buildPetProfileFields(targetProfile)
           });
+          setActiveAccessGrant(null);
+          setSelectedPetSource('profile');
           setSelectedPetId(newPet.id);
           setLastPetId(newPet.id);
           setScreen('play');
           showNotice('New pet created.');
         }}
         onRenamePet={handleRenamePet}
+        onSetPetPin={handleSetPetPin}
         onAssignProfile={handleAssignPetProfile}
         onDeletePet={handleDeletePet}
         onShareApp={handleAppShare}
@@ -618,6 +784,20 @@ function OwnerApp() {
           setPetPinError('');
         }}
         onConfirm={handleUnlockPet}
+      />
+
+      <PinPrompt
+        open={accessPinPromptOpen}
+        title="Open Pet"
+        description="Enter the access PIN you gave this pet."
+        error={accessPinError}
+        confirmLabel="Open Pet"
+        onClose={() => {
+          setAccessPinPromptOpen(false);
+          setAccessPinError('');
+          setPendingAccessRecord(null);
+        }}
+        onConfirm={handleConfirmAccessPin}
       />
     </div>
   );

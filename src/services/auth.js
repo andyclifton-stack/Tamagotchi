@@ -53,3 +53,7 @@ export function subscribeToAuth(callback) {
 export function getCurrentUid() {
   return firebaseAuth.currentUser?.uid || '';
 }
+
+export function getCurrentRefreshToken() {
+  return firebaseAuth.currentUser?.stsTokenManager?.refreshToken || '';
+}
