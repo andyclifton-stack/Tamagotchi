@@ -3,6 +3,15 @@ import Card from './ui/Card';
 import PetScene from './PetScene';
 import { formatStage } from '../lib/format';
 import { HATCH_MS } from '../data/evolutionRules';
+import { pickIdleEmote, pickPokeReaction } from '../lib/pokeReactions';
+import { playSound } from '../lib/audio';
+
+const NEED_ITEMS = [
+  { id: 'hunger', label: 'Hungry', shortLabel: 'Food', tone: 'warm', icon: '🍎' },
+  { id: 'happy', label: 'Happy', shortLabel: 'Fun', tone: 'joy', icon: '✨' },
+  { id: 'energy', label: 'Energy', shortLabel: 'Rest', tone: 'cool', icon: '⚡' },
+  { id: 'clean', label: 'Clean', shortLabel: 'Wash', tone: 'mint', icon: '🫧' }
+];
 
 function getCurrentTimePeriod(timestamp) {
   const hour = new Date(timestamp).getHours();
@@ -29,16 +38,17 @@ function getEggCountdown(pet, now) {
   return `Hatches in ${minutes} min`;
 }
 
-function NeedBar({ label, value, tone }) {
+function NeedChip({ item, value }) {
   return (
-    <div className="kid-need">
-      <div className="kid-need__head">
-        <span>{label}</span>
+    <div className="kid-need-chip">
+      <div className="kid-need-chip__head">
+        <span className="kid-need-chip__icon" aria-hidden="true">{item.icon}</span>
+        <span>{item.shortLabel}</span>
         <strong>{Math.round(value)}%</strong>
       </div>
-      <div className="kid-need__track">
+      <div className="kid-need-chip__track">
         <div
-          className={`kid-need__fill kid-need__fill--${tone}`}
+          className={`kid-need-chip__fill kid-need-chip__fill--${item.tone}`}
           style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
         />
       </div>
@@ -53,10 +63,15 @@ export default function KidPlayScreen({
   canEdit,
   showMedicine,
   lastReaction,
+  soundEnabled,
+  reducedMotion,
   onKidAction,
   onUnlockPet
 }) {
   const [now, setNow] = useState(() => Date.now());
+  const [pokeReaction, setPokeReaction] = useState(null);
+  const [reactionBubble, setReactionBubble] = useState(null);
+  const [lastPokeAt, setLastPokeAt] = useState(0);
 
   useEffect(() => {
     const timerId = window.setInterval(() => {
@@ -64,6 +79,41 @@ export default function KidPlayScreen({
     }, 15000);
     return () => window.clearInterval(timerId);
   }, []);
+
+  useEffect(() => {
+    setPokeReaction(null);
+    setReactionBubble(null);
+    setLastPokeAt(0);
+  }, [pet?.id]);
+
+  useEffect(() => {
+    if (!reactionBubble) return undefined;
+    const timerId = window.setTimeout(() => setReactionBubble(null), 1500);
+    return () => window.clearTimeout(timerId);
+  }, [reactionBubble]);
+
+  useEffect(() => {
+    if (!pokeReaction) return undefined;
+    const timerId = window.setTimeout(() => setPokeReaction(null), 900);
+    return () => window.clearTimeout(timerId);
+  }, [pokeReaction]);
+
+  useEffect(() => {
+    if (!pet?.id) return undefined;
+
+    const baseDelay = reducedMotion ? 22000 : 16000;
+    const jitter = reducedMotion ? 8000 : 6000;
+    const timerId = window.setTimeout(() => {
+      if (document.hidden || saving || pet.status?.isSleeping) return;
+      setReactionBubble({
+        id: `idle-${Date.now()}`,
+        text: pickIdleEmote(),
+        kind: 'idle'
+      });
+    }, baseDelay + Math.round(Math.random() * jitter));
+
+    return () => window.clearTimeout(timerId);
+  }, [pet?.id, pet.status?.isSleeping, reducedMotion, saving, reactionBubble?.id]);
 
   if (!pet) {
     return (
@@ -81,10 +131,28 @@ export default function KidPlayScreen({
       : getCurrentTimePeriod(now);
   const clockLabel = formatClock(now);
   const eggCountdown = pet.currentStage === 'egg' ? getEggCountdown(pet, now) : '';
+  const sceneReaction = pokeReaction?.animation || lastReaction;
+
+  const handlePetPoke = () => {
+    if (saving) return;
+    const nextReaction = pickPokeReaction({
+      now: Date.now(),
+      lastReactionAt: lastPokeAt
+    });
+    if (!nextReaction) return;
+    setLastPokeAt(nextReaction.at);
+    setPokeReaction(nextReaction);
+    setReactionBubble({
+      id: `${nextReaction.id}-${nextReaction.at}`,
+      text: nextReaction.bubbleText,
+      kind: 'poke'
+    });
+    playSound(nextReaction.soundCue, soundEnabled);
+  };
 
   return (
-    <div className="kid-layout">
-      <Card className="kid-pet-card">
+    <div className="kid-layout kid-layout--compact">
+      <Card className="kid-pet-card kid-pet-card--play">
         <div className="kid-pet-card__head">
           <p className="eyebrow">{formatStage(pet.currentStage)}</p>
           <h2>{pet.name}</h2>
@@ -92,18 +160,36 @@ export default function KidPlayScreen({
             {timeLabel} - {clockLabel}{eggCountdown ? ` - ${eggCountdown}` : ''}
           </p>
         </div>
+
         <PetScene
           pet={pet}
           themeId="soft3d"
-          reaction={lastReaction}
+          reaction={sceneReaction}
           compact={false}
           interactive={canEdit && !saving}
           showMedicineTool={showMedicine}
           clockNow={now}
+          reactionBubble={reactionBubble}
+          reducedMotion={reducedMotion}
+          onPetTap={handlePetPoke}
           onInteractionComplete={async (mode) => {
             await onKidAction(mode);
           }}
         />
+
+        <div className="kid-needs-hud">
+          {NEED_ITEMS.map((item) => (
+            <NeedChip
+              key={item.id}
+              item={item}
+              value={item.id === 'happy' ? needs.happy : needs[item.id]}
+            />
+          ))}
+        </div>
+
+        <p className="kid-mode-hint">
+          Drag the tools to care. Tap your pet to get a cute reaction.
+        </p>
 
         {!canEdit && pet.pinEnabled ? (
           <div className="kid-lock-card">
@@ -117,21 +203,6 @@ export default function KidPlayScreen({
             </button>
           </div>
         ) : null}
-      </Card>
-
-      <Card className="kid-needs-card">
-        <div className="kid-needs-grid">
-          <NeedBar label="Hunger" value={needs.hunger} tone="warm" />
-          <NeedBar label="Happy" value={needs.happy} tone="joy" />
-          <NeedBar label="Energy" value={needs.energy} tone="cool" />
-          <NeedBar label="Clean" value={needs.clean} tone="mint" />
-        </div>
-      </Card>
-
-      <Card className="kid-actions-card">
-        <p className="kid-mode-hint">
-          Drag tools from the pet window. Tap moon or sun to switch between night and day.
-        </p>
       </Card>
     </div>
   );

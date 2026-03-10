@@ -6,6 +6,7 @@ import { PET_TYPES } from '../data/petTypes';
 export default function ParentPanel({
   open,
   pets,
+  profiles,
   selectedPetId,
   settings,
   onClose,
@@ -13,6 +14,7 @@ export default function ParentPanel({
   onSelectPet,
   onCreatePet,
   onRenamePet,
+  onAssignProfile,
   onDeletePet,
   onShareApp,
   onSharePet,
@@ -22,7 +24,9 @@ export default function ParentPanel({
   const [showCreate, setShowCreate] = useState(false);
   const [createName, setCreateName] = useState('');
   const [createSpecies, setCreateSpecies] = useState('mochi');
+  const [createProfileId, setCreateProfileId] = useState('');
   const [renameValue, setRenameValue] = useState('');
+  const [selectedProfileId, setSelectedProfileId] = useState('');
   const [working, setWorking] = useState(false);
   const activePet = useMemo(
     () => pets.find((pet) => pet.id === selectedPetId) || pets[0] || null,
@@ -32,8 +36,10 @@ export default function ParentPanel({
   useEffect(() => {
     if (activePet) {
       setRenameValue(activePet.name);
+      setSelectedProfileId(activePet.profileId || 'shared');
     } else {
       setRenameValue('');
+      setSelectedProfileId('shared');
     }
   }, [activePet?.id]);
 
@@ -47,6 +53,7 @@ export default function ParentPanel({
       await onCreatePet({
         name: nextName,
         speciesId: createSpecies,
+        profileId: createProfileId || 'shared',
         theme: 'soft3d',
         liveForeverMode: true,
         pin: ''
@@ -65,6 +72,16 @@ export default function ParentPanel({
     setWorking(true);
     try {
       await onRenamePet(nextName);
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const handleAssignProfile = async () => {
+    if (!activePet) return;
+    setWorking(true);
+    try {
+      await onAssignProfile(selectedProfileId || 'shared');
     } finally {
       setWorking(false);
     }
@@ -150,6 +167,23 @@ export default function ParentPanel({
                   ))}
                 </select>
               </label>
+              <label className="field">
+                <span className="field-label">Profile</span>
+                <select
+                  className="field-select"
+                  value={createProfileId}
+                  onChange={(event) => setCreateProfileId(event.target.value)}
+                >
+                  <option value="shared">Shared</option>
+                  {profiles
+                    .filter((profile) => !profile.system)
+                    .map((profile) => (
+                      <option key={profile.id} value={profile.id}>
+                        {profile.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
               <Button
                 type="button"
                 disabled={working || !createName.trim()}
@@ -194,6 +228,31 @@ export default function ParentPanel({
                   Delete Pet
                 </Button>
               </div>
+              <label className="field">
+                <span className="field-label">Move To Profile</span>
+                <select
+                  className="field-select"
+                  value={selectedProfileId}
+                  onChange={(event) => setSelectedProfileId(event.target.value)}
+                >
+                  <option value="shared">Shared</option>
+                  {profiles
+                    .filter((profile) => !profile.system)
+                    .map((profile) => (
+                      <option key={profile.id} value={profile.id}>
+                        {profile.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={working}
+                onClick={handleAssignProfile}
+              >
+                Move Pet
+              </Button>
             </div>
           ) : (
             <p className="muted-text">Create a pet to begin.</p>

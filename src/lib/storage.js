@@ -10,6 +10,8 @@ const LAST_PET_KEY = 'tamagotchi_last_pet_v1';
 const PARENT_GATE_KEY = 'tamagotchi_parent_gate_v1';
 const PARENT_PIN_KEY = 'tamagotchi_parent_pin_v1';
 const PET_CACHE_KEY = 'tamagotchi_pet_cache_v1';
+const PROFILES_KEY = 'tamagotchi_profiles_v1';
+const ACTIVE_PROFILE_KEY = 'tamagotchi_active_profile_v1';
 
 function safeParse(raw, fallback) {
   try {
@@ -94,6 +96,26 @@ export function clearCachedPetSnapshot() {
   localStorage.removeItem(PET_CACHE_KEY);
 }
 
+export function loadKidProfiles() {
+  return safeParse(localStorage.getItem(PROFILES_KEY), []);
+}
+
+export function saveKidProfiles(profiles) {
+  localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles || []));
+}
+
+export function getActiveProfileId() {
+  return localStorage.getItem(ACTIVE_PROFILE_KEY) || '';
+}
+
+export function setActiveProfileId(profileId) {
+  localStorage.setItem(ACTIVE_PROFILE_KEY, profileId || '');
+}
+
+export function clearActiveProfileId() {
+  localStorage.removeItem(ACTIVE_PROFILE_KEY);
+}
+
 export function getParentGateState(now = Date.now()) {
   const current = safeParse(localStorage.getItem(PARENT_GATE_KEY), null);
   if (!current || !current.unlocked || current.expiresAt <= now) {
@@ -136,4 +158,6 @@ export function clearLocalAppData() {
   localStorage.removeItem(PARENT_GATE_KEY);
   localStorage.removeItem(PARENT_PIN_KEY);
   localStorage.removeItem(PET_CACHE_KEY);
+  localStorage.removeItem(PROFILES_KEY);
+  localStorage.removeItem(ACTIVE_PROFILE_KEY);
 }

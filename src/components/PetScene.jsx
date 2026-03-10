@@ -21,7 +21,8 @@ const TOOL_ICONS = {
   sparkle: '\u2728'
 };
 
-function expressionForMood(mood) {
+function expressionForMood(mood, reactionFace = '') {
+  if (reactionFace) return reactionFace;
   if (mood === 'sleeping') return 'sleep';
   if (mood === 'sparkly') return 'happy';
   if (mood === 'hungry' || mood === 'grumpy' || mood === 'care-center') return 'sad';
@@ -117,8 +118,8 @@ function getEarPath(ears) {
   return 'M74 98c10-28 26-44 42-52M146 98c-10-28-26-44-42-52';
 }
 
-function SvgPet({ pet, species }) {
-  const expression = expressionForMood(pet.currentMood);
+function SvgPet({ pet, species, reactionFace = '' }) {
+  const expression = expressionForMood(pet.currentMood, reactionFace);
   const scale = stageScale(pet.currentStage);
   const cheekOpacity = species.render.cheeks ? 0.75 : 0;
   const branchGlow = pet.evolutionBranch === 'bright' ? 1 : 0.35;
@@ -307,7 +308,7 @@ function SvgPet({ pet, species }) {
                   cx="88"
                   cy="112"
                   rx="11"
-                  ry={expression === 'ill' ? 6 : 12}
+                  ry={expression === 'ill' ? 6 : expression === 'playful' ? 5 : 12}
                   fill={outlineColor}
                 />
                 <ellipse
@@ -315,7 +316,7 @@ function SvgPet({ pet, species }) {
                   cx="132"
                   cy="112"
                   rx="11"
-                  ry={expression === 'ill' ? 6 : 12}
+                  ry={expression === 'ill' ? 6 : expression === 'playful' ? 12 : 12}
                   fill={outlineColor}
                 />
                 <ellipse
@@ -339,21 +340,39 @@ function SvgPet({ pet, species }) {
               </g>
             </g>
           )}
-          <ellipse cx="82" cy="134" rx="12" ry="8" fill={species.colors.accent} opacity={cheekOpacity} />
-          <ellipse cx="138" cy="134" rx="12" ry="8" fill={species.colors.accent} opacity={cheekOpacity} />
+          <ellipse
+            cx="82"
+            cy="134"
+            rx="12"
+            ry="8"
+            fill={species.colors.accent}
+            opacity={expression === 'blush' ? 1 : cheekOpacity}
+          />
+          <ellipse
+            cx="138"
+            cy="134"
+            rx="12"
+            ry="8"
+            fill={species.colors.accent}
+            opacity={expression === 'blush' ? 1 : cheekOpacity}
+          />
           <path
             className="pet-character__mouth"
             d={
-              expression === 'sad' || expression === 'ill'
+              expression === 'shocked'
+                ? 'M102 142c4-5 12-5 16 0 3 4 3 12 0 16-4 5-12 5-16 0-3-4-3-12 0-16'
+                : expression === 'sad' || expression === 'ill'
                 ? 'M92 150c10-8 26-8 36 0'
                 : expression === 'happy'
                   ? 'M88 144c10 16 34 16 44 0'
-                  : 'M94 146c8 6 24 6 32 0'
+                  : expression === 'playful'
+                    ? 'M92 144c12 12 26 12 36 0'
+                    : 'M94 146c8 6 24 6 32 0'
             }
             stroke={outlineColor}
             strokeWidth="8"
             strokeLinecap="round"
-            fill="none"
+            fill={expression === 'shocked' ? '#ffffff' : 'none'}
           />
           <circle className="pet-character__nose" cx="110" cy="136" r="4" fill={outlineColor} opacity="0.4" />
           {pet.evolutionBranch ? (
@@ -378,6 +397,9 @@ export default function PetScene({
   interactive = false,
   showMedicineTool = false,
   clockNow = Date.now(),
+  reactionBubble = null,
+  reducedMotion = false,
+  onPetTap,
   onInteractionComplete
 }) {
   const canvasRef = useRef(null);
@@ -408,6 +430,17 @@ export default function PetScene({
   const playMode = activeMode === 'play';
   const sleepMode = activeMode === 'sleep';
   const medicineMode = activeMode === 'medicine';
+  const pokeFace = reaction === 'laugh' || reaction === 'smile' || reaction === 'proud' || reaction === 'sparkle'
+    ? 'happy'
+    : reaction === 'blush'
+      ? 'blush'
+      : reaction === 'sleepy'
+        ? 'sleep'
+        : reaction === 'shocked'
+          ? 'shocked'
+          : reaction === 'silly'
+            ? 'playful'
+            : '';
   const scrubGoal = 0.72;
   const feedGoal = 1;
   const dustAlpha = Math.max(0, 1 - interactionProgress);
@@ -544,7 +577,13 @@ export default function PetScene({
   const handlePointerDown = (event) => {
     if (!interactive) return;
     const source = event.target.closest?.('[data-tool]');
-    if (!source) return;
+    if (!source) {
+      const petBody = event.target.closest?.('[data-pet-body]');
+      if (petBody && typeof onPetTap === 'function') {
+        onPetTap();
+      }
+      return;
+    }
     const mode = source.getAttribute('data-tool') || '';
     if (!mode) return;
 
@@ -604,10 +643,20 @@ export default function PetScene({
         </div>
         <div className={`pet-avatar pet-avatar--${reaction}`}>
           <div className="pet-avatar__halo" aria-hidden="true" />
+          {reactionBubble?.text ? (
+            <div className={`pet-scene__reaction-bubble pet-scene__reaction-bubble--${reactionBubble.kind || 'poke'}`}>
+              {reactionBubble.text}
+            </div>
+          ) : null}
           {theme.family === 'retro' ? (
             <canvas ref={canvasRef} className="pet-retro-canvas" width="200" height="180" />
           ) : (
-            <SvgPet pet={pet} species={species} />
+            <div
+              className={`pet-avatar__body${typeof onPetTap === 'function' ? ' is-tappable' : ''}${reducedMotion ? ' is-reduced-motion' : ''}`}
+              data-pet-body="true"
+            >
+              <SvgPet pet={pet} species={species} reactionFace={pokeFace} />
+            </div>
           )}
         </div>
         {sleepingNow ? (
